@@ -1,9 +1,14 @@
 # MyTwin - START Hack Tour 2026 Interlaken
 
-**Track:** My Future Health - Meet Your Digital Twin  
-**Case Partner:** Monash University  
+**Team:** 404 Brain Not Found (Miloh Zwahlen, Keith Mader)
+
+**Case:** My Future Health - Meet Your Digital Twin  
+
 **Platform:** Android  
+
 **Project Type:** Personal health twin
+
+**Event:** START Hack Tour 2026 Interlaken
 
 ---
 
@@ -115,14 +120,16 @@ your future self.
 
 ## How To Run Locally
 
-### Requirements
+### MyTwin Mobile App
+
+#### Requirements
 
 - Android Studio
 - Android SDK 36
 - Java 11+
 - A Samsung device with Samsung Health if you want full wearable integration
 
-### 1. Configure `local.properties`
+#### 1. Configure `local.properties`
 
 This project reads the Claude key directly from `local.properties` for demo purposes.
 
@@ -135,22 +142,58 @@ claudeModel=claude-sonnet-4-20250514
 
 `claudeModel` is optional. If omitted, the app uses a default Claude Sonnet model.
 
-### 2. Build the App
+#### 2. Build the App
 
 ```bash
 ./gradlew assembleDebug
 ```
 
-### 3. Run Unit Tests
+#### 3. Run Unit Tests
 
 ```bash
 ./gradlew testDebugUnitTest
 ```
 
-### 4. Install on Device
+#### 4. Install on Device
 
 ```bash
 ./gradlew installDebug
+```
+
+### MyTwin Docs
+
+#### 1. Navigate to the `docs/mytwin-mkdocs` folder
+
+```bash
+cd /docs/mytwin-mkdocs
+```
+
+#### 2. Setup the environment
+
+```bash
+pythom -m venv .venv
+```
+
+#### 3. Activate the environment
+
+```bash
+# Windows
+.venv\Scripts\activate
+
+# Linux
+source .venv/bin/activate
+```
+
+#### 4. Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+#### 5. Run the server
+
+```bash
+mkdocs serve
 ```
 
 ---

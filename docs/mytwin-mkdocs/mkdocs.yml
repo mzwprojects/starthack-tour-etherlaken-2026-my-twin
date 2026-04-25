@@ -1,0 +1,90 @@
+site_name: MyTwin
+site_description: Personal digital health twin — Android app built for START Hack Tour 2026 Interlaken
+site_author: mzwprojects
+repo_url: https://github.com/mzwprojects/starthack-tour-etherlaken-2026-my-twin
+repo_name: mzwprojects/mytwin
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: teal
+      accent: light green
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: teal
+      accent: light green
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  font:
+    text: Outfit
+    code: JetBrains Mono
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+    - toc.follow
+  icon:
+    repo: fontawesome/brands/github
+    logo: material/heart-pulse
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - Architecture:
+    - Overview: architecture/overview.md
+    - Layers: architecture/layers.md
+    - Navigation: architecture/navigation.md
+    - Dependency Injection: architecture/dependency-injection.md
+  - Features:
+    - Onboarding: features/onboarding.md
+    - Home Dashboard: features/home-dashboard.md
+    - Simulation Engine: features/simulation.md
+    - AI Twin Chat: features/chat.md
+    - Food Scanner: features/food-scan.md
+  - Data Layer:
+    - Samsung Health: data/samsung-health.md
+    - User Profile: data/user-profile.md
+    - Wearable Signals: data/wearable-signals.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/mzwprojects
