@@ -6,6 +6,7 @@ import android.util.Log
 import com.mzwprojects.mytwin.data.model.WearableSignal
 import com.samsung.android.sdk.health.data.HealthDataService
 import com.samsung.android.sdk.health.data.HealthDataStore
+import com.samsung.android.sdk.health.data.error.ErrorCode
 import com.samsung.android.sdk.health.data.error.AuthorizationException
 import com.samsung.android.sdk.health.data.error.HealthDataException
 import com.samsung.android.sdk.health.data.error.InvalidRequestException
@@ -13,13 +14,16 @@ import com.samsung.android.sdk.health.data.error.PlatformInternalException
 import com.samsung.android.sdk.health.data.error.ResolvablePlatformException
 import com.samsung.android.sdk.health.data.permission.AccessType
 import com.samsung.android.sdk.health.data.permission.Permission
+import com.samsung.android.sdk.health.data.device.DeviceGroup
 import com.samsung.android.sdk.health.data.request.DataType
 import com.samsung.android.sdk.health.data.request.DataTypes
 import com.samsung.android.sdk.health.data.request.LocalTimeFilter
 import com.samsung.android.sdk.health.data.request.LocalTimeGroup
 import com.samsung.android.sdk.health.data.request.LocalTimeGroupUnit
 import com.samsung.android.sdk.health.data.request.Ordering
+import com.samsung.android.sdk.health.data.request.ReadSourceFilter
 import java.time.LocalDateTime
+import kotlin.math.roundToInt
 
 /**
  * Samsung Health Data SDK v1.1.0 wrapper.
@@ -41,6 +45,7 @@ class SamsungHealthDataSource(context: Context) {
         SamsungHealthMetric.SLEEP to Permission.of(DataTypes.SLEEP, AccessType.READ),
         SamsungHealthMetric.STEPS to Permission.of(DataTypes.STEPS, AccessType.READ),
         SamsungHealthMetric.HEART_RATE to Permission.of(DataTypes.HEART_RATE, AccessType.READ),
+        SamsungHealthMetric.STRESS to Permission.of(DataTypes.ENERGY_SCORE, AccessType.READ),
     )
 
     private val readPermissions: Set<Permission> = metricPermissions.values.toSet()
@@ -55,32 +60,48 @@ class SamsungHealthDataSource(context: Context) {
 
     fun connect(): Boolean = isConnected
 
-    suspend fun grantedMetrics(activity: Activity? = null): Set<SamsungHealthMetric> {
+    suspend fun permissionStatus(activity: Activity? = null): SamsungPermissionStatus {
         return try {
             val grantedPermissions = store.getGrantedPermissions(readPermissions)
-            metricPermissions
-                .filterValues { it in grantedPermissions }
-                .keys
+            SamsungPermissionStatus.Success(
+                metricPermissions
+                    .filterValues { it in grantedPermissions }
+                    .keys,
+            )
+        } catch (error: AuthorizationException) {
+            handleHealthDataException("Permission check failed", error, activity)
+            if (error.errorCode == ErrorCode.ERR_ACCESS_CONTROL) {
+                SamsungPermissionStatus.PolicyDenied
+            } else {
+                SamsungPermissionStatus.Error(error.errorMessage)
+            }
         } catch (error: HealthDataException) {
             handleHealthDataException("Permission check failed", error, activity)
-            emptySet()
+            SamsungPermissionStatus.Error(error.errorMessage)
         } catch (error: Throwable) {
             Log.w(TAG, "Permission check failed", error)
-            emptySet()
+            SamsungPermissionStatus.Error(error.message)
         }
     }
+
+    suspend fun grantedMetrics(activity: Activity? = null): Set<SamsungHealthMetric> =
+        when (val status = permissionStatus(activity)) {
+            is SamsungPermissionStatus.Success -> status.grantedMetrics
+            SamsungPermissionStatus.PolicyDenied -> emptySet()
+            is SamsungPermissionStatus.Error -> emptySet()
+        }
 
     suspend fun areAllPermissionsGranted(activity: Activity? = null): Boolean {
         return grantedMetrics(activity).containsAll(SamsungHealthMetric.entries)
     }
 
-    suspend fun requestPermissions(activity: Activity): Boolean {
+    suspend fun requestPermissions(activity: Activity): SamsungPermissionRequestResult {
         return try {
             val grantedPermissions = store.getGrantedPermissions(readPermissions)
             val missingPermissions = readPermissions - grantedPermissions
 
             if (missingPermissions.isEmpty()) {
-                return true
+                return SamsungPermissionRequestResult.Granted
             }
 
             val newlyGrantedPermissions = store.requestPermissions(
@@ -88,18 +109,29 @@ class SamsungHealthDataSource(context: Context) {
                 activity,
             )
 
-            newlyGrantedPermissions.containsAll(missingPermissions)
+            if (newlyGrantedPermissions.containsAll(missingPermissions)) {
+                SamsungPermissionRequestResult.Granted
+            } else {
+                SamsungPermissionRequestResult.Denied
+            }
+        } catch (error: AuthorizationException) {
+            handleHealthDataException("Permission request failed", error, activity)
+            if (error.errorCode == ErrorCode.ERR_ACCESS_CONTROL) {
+                SamsungPermissionRequestResult.PolicyDenied
+            } else {
+                SamsungPermissionRequestResult.Failed(error.errorMessage)
+            }
         } catch (error: HealthDataException) {
             handleHealthDataException("Permission request failed", error, activity)
-            false
+            SamsungPermissionRequestResult.Failed(error.errorMessage)
         } catch (error: Throwable) {
             Log.e(TAG, "Permission request failed", error)
-            false
+            SamsungPermissionRequestResult.Failed(error.message)
         }
     }
 
     suspend fun stepsToday(): Int? {
-        if (!areAllPermissionsGranted()) return null
+        if (SamsungHealthMetric.STEPS !in grantedMetrics()) return null
 
         return try {
             val now = LocalDateTime.now()
@@ -134,27 +166,13 @@ class SamsungHealthDataSource(context: Context) {
     }
 
     suspend fun lastNightSleepHours(): Float? {
-        if (!areAllPermissionsGranted()) return null
+        if (SamsungHealthMetric.SLEEP !in grantedMetrics()) return null
 
         return try {
             val now = LocalDateTime.now()
             val start = now.minusHours(36)
-
-            val filter = LocalTimeFilter.of(start, now)
-
-            val request = DataTypes.SLEEP.readDataRequestBuilder
-                .setLocalTimeFilter(filter)
-                .setOrdering(Ordering.DESC)
-                .build()
-
-            store.readData(request)
-                .dataList
-                .mapNotNull { dataPoint ->
-                    dataPoint.getValue(DataType.SleepType.DURATION)
-                }
-                .maxOfOrNull { duration ->
-                    duration.toMinutes().toFloat() / 60f
-                }
+            readSleepDurations(start, now)
+                .maxOrNull()
         } catch (error: HealthDataException) {
             handleHealthDataException("lastNightSleepHours failed", error)
             null
@@ -165,16 +183,87 @@ class SamsungHealthDataSource(context: Context) {
     }
 
     suspend fun latestHeartRate(): Int? {
-        if (!areAllPermissionsGranted()) return null
+        if (SamsungHealthMetric.HEART_RATE !in grantedMetrics()) return null
 
         return try {
             val now = LocalDateTime.now()
             val start = now.minusDays(7)
+            readHeartRateValues(start, now)
+                .firstOrNull()
+                ?.roundToInt()
+        } catch (error: HealthDataException) {
+            handleHealthDataException("latestHeartRate failed", error)
+            null
+        } catch (error: Throwable) {
+            Log.w(TAG, "latestHeartRate failed", error)
+            null
+        }
+    }
 
-            val filter = LocalTimeFilter.of(start, now)
+    suspend fun representativeSleepHours(days: Long = 14): Float? {
+        if (SamsungHealthMetric.SLEEP !in grantedMetrics()) return null
 
-            val request = DataTypes.HEART_RATE.readDataRequestBuilder
-                .setLocalTimeFilter(filter)
+        return try {
+            val now = LocalDateTime.now()
+            val durations = readSleepDurations(now.minusDays(days), now)
+
+            durations
+                .takeIf { it.isNotEmpty() }
+                ?.average()
+                ?.toFloat()
+        } catch (error: HealthDataException) {
+            handleHealthDataException("representativeSleepHours failed", error)
+            null
+        } catch (error: Throwable) {
+            Log.w(TAG, "representativeSleepHours failed", error)
+            null
+        }
+    }
+
+    suspend fun representativeDailySteps(days: Long = 14): Int? {
+        if (SamsungHealthMetric.STEPS !in grantedMetrics()) return null
+
+        return try {
+            val now = LocalDateTime.now()
+            val request = DataType.StepsType.TOTAL.requestBuilder
+                .setLocalTimeFilterWithGroup(
+                    LocalTimeFilter.of(now.minusDays(days), now),
+                    LocalTimeGroup.of(LocalTimeGroupUnit.DAILY, 1),
+                )
+                .setOrdering(Ordering.ASC)
+                .build()
+
+            val dailyTotals = store.aggregateData(request)
+                .dataList
+                .mapNotNull { aggregatedData ->
+                    aggregatedData.value?.takeIf { it > 0L }
+                }
+
+            dailyTotals
+                .takeIf { it.isNotEmpty() }
+                ?.average()
+                ?.roundToInt()
+        } catch (error: HealthDataException) {
+            handleHealthDataException("representativeDailySteps failed", error)
+            null
+        } catch (error: Throwable) {
+            Log.w(TAG, "representativeDailySteps failed", error)
+            null
+        }
+    }
+
+    suspend fun latestStressLevel(days: Long = 7): Int? {
+        if (SamsungHealthMetric.STRESS !in grantedMetrics()) return null
+
+        return try {
+            val today = LocalDateTime.now().toLocalDate()
+            val request = DataTypes.ENERGY_SCORE.readDataRequestBuilder
+                .setLocalDateFilter(
+                    com.samsung.android.sdk.health.data.request.LocalDateFilter.of(
+                        today.minusDays(days),
+                        today,
+                    ),
+                )
                 .setOrdering(Ordering.DESC)
                 .setLimit(1)
                 .build()
@@ -182,13 +271,13 @@ class SamsungHealthDataSource(context: Context) {
             store.readData(request)
                 .dataList
                 .firstOrNull()
-                ?.getValue(DataType.HeartRateType.HEART_RATE)
-                ?.toInt()
+                ?.getValue(DataType.EnergyScoreType.ENERGY_SCORE)
+                ?.let(::mapEnergyScoreToStressLevel)
         } catch (error: HealthDataException) {
-            handleHealthDataException("latestHeartRate failed", error)
+            handleHealthDataException("latestStressLevel failed", error)
             null
         } catch (error: Throwable) {
-            Log.w(TAG, "latestHeartRate failed", error)
+            Log.w(TAG, "latestStressLevel failed", error)
             null
         }
     }
@@ -221,6 +310,7 @@ class SamsungHealthDataSource(context: Context) {
             SamsungHealthMetric.SLEEP -> hasSleepData(start, end)
             SamsungHealthMetric.STEPS -> hasStepsData(start, end)
             SamsungHealthMetric.HEART_RATE -> hasHeartRateData(start, end)
+            SamsungHealthMetric.STRESS -> hasStressData(start, end)
         }
     }
 
@@ -229,13 +319,7 @@ class SamsungHealthDataSource(context: Context) {
         end: LocalDateTime,
     ): Boolean {
         return try {
-            val request = DataTypes.SLEEP.readDataRequestBuilder
-                .setLocalTimeFilter(LocalTimeFilter.of(start, end))
-                .setOrdering(Ordering.DESC)
-                .setLimit(1)
-                .build()
-
-            store.readData(request).dataList.isNotEmpty()
+            readSleepDurations(start, end).isNotEmpty()
         } catch (error: HealthDataException) {
             handleHealthDataException("hasSleepData failed", error)
             false
@@ -275,13 +359,7 @@ class SamsungHealthDataSource(context: Context) {
         end: LocalDateTime,
     ): Boolean {
         return try {
-            val request = DataTypes.HEART_RATE.readDataRequestBuilder
-                .setLocalTimeFilter(LocalTimeFilter.of(start, end))
-                .setOrdering(Ordering.DESC)
-                .setLimit(1)
-                .build()
-
-            store.readData(request).dataList.isNotEmpty()
+            readHeartRateValues(start, end).isNotEmpty()
         } catch (error: HealthDataException) {
             handleHealthDataException("hasHeartRateData failed", error)
             false
@@ -289,6 +367,101 @@ class SamsungHealthDataSource(context: Context) {
             Log.w(TAG, "hasHeartRateData failed", error)
             false
         }
+    }
+
+    private suspend fun hasStressData(
+        start: LocalDateTime,
+        end: LocalDateTime,
+    ): Boolean {
+        return try {
+            val request = DataTypes.ENERGY_SCORE.readDataRequestBuilder
+                .setLocalDateFilter(
+                    com.samsung.android.sdk.health.data.request.LocalDateFilter.of(
+                        start.toLocalDate(),
+                        end.toLocalDate(),
+                    ),
+                )
+                .setOrdering(Ordering.DESC)
+                .setLimit(1)
+                .build()
+
+            store.readData(request).dataList.isNotEmpty()
+        } catch (error: HealthDataException) {
+            handleHealthDataException("hasStressData failed", error)
+            false
+        } catch (error: Throwable) {
+            Log.w(TAG, "hasStressData failed", error)
+            false
+        }
+    }
+
+    private fun mapEnergyScoreToStressLevel(energyScore: Float): Int {
+        val clampedScore = energyScore.coerceIn(0f, 100f)
+        return (10f - (clampedScore / 100f) * 9f).roundToInt().coerceIn(1, 10)
+    }
+
+    private suspend fun readSleepDurations(
+        start: LocalDateTime,
+        end: LocalDateTime,
+    ): List<Float> {
+        val filter = LocalTimeFilter.of(start, end)
+        return readWithSourceFallbacks(
+            query = { sourceFilter ->
+                val builder = DataTypes.SLEEP.readDataRequestBuilder
+                    .setLocalTimeFilter(filter)
+                    .setOrdering(Ordering.DESC)
+                if (sourceFilter != null) builder.setSourceFilter(sourceFilter)
+                store.readData(builder.build()).dataList
+                    .flatMap { dataPoint ->
+                        buildList {
+                            dataPoint.getValue(DataType.SleepType.DURATION)?.let { duration ->
+                                add(duration.toMinutes().toFloat() / 60f)
+                            }
+                            dataPoint.getValue(DataType.SleepType.SESSIONS)
+                                ?.map { session -> session.duration.toMinutes().toFloat() / 60f }
+                                ?.let(::addAll)
+                        }
+                    }
+            },
+        )
+    }
+
+    private suspend fun readHeartRateValues(
+        start: LocalDateTime,
+        end: LocalDateTime,
+    ): List<Float> {
+        val filter = LocalTimeFilter.of(start, end)
+        return readWithSourceFallbacks(
+            query = { sourceFilter ->
+                val builder = DataTypes.HEART_RATE.readDataRequestBuilder
+                    .setLocalTimeFilter(filter)
+                    .setOrdering(Ordering.DESC)
+                if (sourceFilter != null) builder.setSourceFilter(sourceFilter)
+                store.readData(builder.build()).dataList
+                    .flatMap { dataPoint ->
+                        buildList {
+                            dataPoint.getValue(DataType.HeartRateType.HEART_RATE)?.let(::add)
+                            dataPoint.getValue(DataType.HeartRateType.SERIES_DATA)
+                                ?.map { seriesPoint -> seriesPoint.heartRate }
+                                ?.let(::addAll)
+                            dataPoint.getValue(DataType.HeartRateType.MAX_HEART_RATE)?.let(::add)
+                            dataPoint.getValue(DataType.HeartRateType.MIN_HEART_RATE)?.let(::add)
+                        }
+                    }
+            },
+        )
+    }
+
+    private suspend fun <T> readWithSourceFallbacks(
+        query: suspend (ReadSourceFilter?) -> List<T>,
+    ): List<T> {
+        for (sourceFilter in preferredSourceFilters) {
+            val result = query(sourceFilter)
+            if (result.isNotEmpty()) {
+                return result
+            }
+        }
+        return emptyList()
     }
 
     private fun handleHealthDataException(
@@ -325,6 +498,13 @@ class SamsungHealthDataSource(context: Context) {
 
     companion object {
         private const val TAG = "SamsungHealth"
+        private val preferredSourceFilters: List<ReadSourceFilter?> = listOf(
+            null,
+            ReadSourceFilter.fromDeviceType(DeviceGroup.WATCH),
+            ReadSourceFilter.fromDeviceType(DeviceGroup.RING),
+            ReadSourceFilter.fromDeviceType(DeviceGroup.BAND),
+            ReadSourceFilter.fromLocalDevice(),
+        )
     }
 }
 
@@ -332,4 +512,18 @@ enum class SamsungHealthMetric {
     SLEEP,
     STEPS,
     HEART_RATE,
+    STRESS,
+}
+
+sealed interface SamsungPermissionStatus {
+    data class Success(val grantedMetrics: Set<SamsungHealthMetric>) : SamsungPermissionStatus
+    data object PolicyDenied : SamsungPermissionStatus
+    data class Error(val message: String?) : SamsungPermissionStatus
+}
+
+sealed interface SamsungPermissionRequestResult {
+    data object Granted : SamsungPermissionRequestResult
+    data object Denied : SamsungPermissionRequestResult
+    data object PolicyDenied : SamsungPermissionRequestResult
+    data class Failed(val message: String?) : SamsungPermissionRequestResult
 }

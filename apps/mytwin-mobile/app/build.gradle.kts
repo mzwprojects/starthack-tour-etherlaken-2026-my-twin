@@ -55,6 +55,7 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.kotlinx.serialization.json)
+    runtimeOnly(libs.kotlin.parcelize.runtime)
     implementation(files("libs/samsung-health-data-api-1.1.0.aar"))
 
     debugImplementation(libs.androidx.compose.ui.tooling)

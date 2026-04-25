@@ -22,6 +22,7 @@ data class HomeUiState(
     val stepsIsFromWearable: Boolean = false,
     val restingHR: Int? = null,
     val stressLevel: Int? = null,
+    val stressIsFromWearable: Boolean = false,
     val showWearableNudge: Boolean = false,
     val isLoading: Boolean = true,
 ) {
@@ -33,10 +34,10 @@ data class HomeUiState(
         }
 
     val canEditSleepManually: Boolean
-        get() = !sleepIsFromWearable
+        get() = true
 
     val canEditStepsManually: Boolean
-        get() = !stepsIsFromWearable
+        get() = true
 }
 
 enum class GreetingTime { MORNING, AFTERNOON, EVENING }
@@ -55,6 +56,12 @@ class HomeViewModel(
             userProfileRepository.profile.collect { profile ->
                 refreshSnapshot(profile)
             }
+        }
+    }
+
+    fun refresh() {
+        viewModelScope.launch {
+            refreshSnapshot(_uiState.value.profile)
         }
     }
 
@@ -77,20 +84,24 @@ class HomeViewModel(
     }
 
     private suspend fun refreshSnapshot(profile: UserProfile) {
-        val wearableSleep = healthRepository.lastNightSleepHours()
-        val wearableSteps = healthRepository.stepsToday()
+        val latestSleep = healthRepository.lastNightSleepHours()
+        val representativeSleep = healthRepository.representativeSleepHours()
+        val latestSteps = healthRepository.stepsToday()
+        val representativeSteps = healthRepository.representativeDailySteps()
         val wearableHeartRate = healthRepository.latestRestingHeartRate()
+        val wearableStress = healthRepository.latestStressLevel()
         val signals = healthRepository.signalsByMetric()
 
         _uiState.update {
             HomeUiState(
                 profile = profile,
-                sleepHours = wearableSleep ?: profile.averageSleepHours,
-                sleepIsFromWearable = wearableSleep != null,
-                stepsToday = wearableSteps ?: profile.averageDailySteps,
-                stepsIsFromWearable = wearableSteps != null,
+                sleepHours = latestSleep ?: representativeSleep ?: profile.averageSleepHours,
+                sleepIsFromWearable = latestSleep != null || representativeSleep != null,
+                stepsToday = latestSteps ?: representativeSteps ?: profile.averageDailySteps,
+                stepsIsFromWearable = latestSteps != null || representativeSteps != null,
                 restingHR = wearableHeartRate,
-                stressLevel = profile.perceivedStressLevel,
+                stressLevel = wearableStress ?: profile.perceivedStressLevel,
+                stressIsFromWearable = wearableStress != null,
                 showWearableNudge = signals.values.any {
                     it == WearableSignal.DEVICE_PRESENT_NOT_WORN_RECENTLY
                 },

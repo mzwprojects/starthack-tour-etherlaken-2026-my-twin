@@ -293,6 +293,35 @@ private fun PermissionsStep(
             }
         }
 
+        state.samsungPolicyBlocked -> {
+            ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.onboarding_samsung_policy_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    Text(
+                        text = stringResource(R.string.onboarding_samsung_policy_body),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            OutlinedButton(
+                onClick = onNext,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                shape = MaterialTheme.shapes.extraLarge,
+            ) {
+                Text(stringResource(R.string.onboarding_permissions_skip))
+            }
+        }
+
         else -> {
             ElevatedCard(modifier = Modifier.fillMaxWidth()) {
                 Column(
@@ -322,6 +351,11 @@ private fun PermissionsStep(
                         label = stringResource(R.string.onboarding_metric_heart_rate),
                         signal = state.metricSignals[SamsungHealthMetric.HEART_RATE],
                         isGranted = SamsungHealthMetric.HEART_RATE in state.grantedMetrics,
+                    )
+                    PermissionStatusRow(
+                        label = stringResource(R.string.onboarding_metric_stress),
+                        signal = state.metricSignals[SamsungHealthMetric.STRESS],
+                        isGranted = SamsungHealthMetric.STRESS in state.grantedMetrics,
                     )
                 }
             }
@@ -397,11 +431,35 @@ private fun ManualDataStep(state: OnboardingUiState, vm: OnboardingViewModel) {
     )
     if (!state.needsSleepInput && !state.needsStepsInput) {
         ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-            Text(
-                text = stringResource(R.string.onboarding_manual_all_covered),
-                style = MaterialTheme.typography.bodyLarge,
+            Column(
                 modifier = Modifier.padding(20.dp),
-            )
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.onboarding_manual_all_covered),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                state.representativeSleepHours?.let {
+                    ReviewRow(
+                        label = stringResource(R.string.onboarding_metric_sleep),
+                        value = stringResource(
+                            R.string.onboarding_sleep_value,
+                            it,
+                            stringResource(R.string.unit_hours_night),
+                        ),
+                    )
+                }
+                state.representativeDailySteps?.let {
+                    ReviewRow(
+                        label = stringResource(R.string.onboarding_metric_steps),
+                        value = stringResource(
+                            R.string.onboarding_steps_value,
+                            it,
+                            stringResource(R.string.unit_steps_day),
+                        ),
+                    )
+                }
+            }
         }
     } else {
         if (state.needsSleepInput) {
@@ -444,6 +502,13 @@ private fun ManualDataStep(state: OnboardingUiState, vm: OnboardingViewModel) {
         startLabel = stringResource(R.string.onboarding_stress_low),
         endLabel = stringResource(R.string.onboarding_stress_high),
     )
+    if (state.wearableStressLevel != null) {
+        Text(
+            text = stringResource(R.string.onboarding_stress_proxy_note, state.wearableStressLevel),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
     Spacer(Modifier.height(8.dp))
     StepNavButtons(onBack = vm::back, onNext = vm::advance)
 }
@@ -610,7 +675,11 @@ private fun ReviewStep(
 @Composable
 private fun StepHeader(title: String, subtitle: String) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(text = title, style = MaterialTheme.typography.headlineSmall)
+        Text(
+            text = title,
+            style = MaterialTheme.typography.headlineSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
         Text(
             text = subtitle,
             style = MaterialTheme.typography.bodyMedium,

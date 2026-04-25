@@ -4,6 +4,8 @@ import android.app.Activity
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mzwprojects.mytwin.data.datasource.SamsungHealthMetric
+import com.mzwprojects.mytwin.data.datasource.SamsungPermissionRequestResult
+import com.mzwprojects.mytwin.data.datasource.SamsungPermissionStatus
 import com.mzwprojects.mytwin.data.model.BiologicalSex
 import com.mzwprojects.mytwin.data.model.DietQuality
 import com.mzwprojects.mytwin.data.model.SmokingStatus
@@ -33,6 +35,11 @@ data class OnboardingUiState(
     val isSamsungHealthAvailable: Boolean = false,
     val grantedMetrics: Set<SamsungHealthMetric> = emptySet(),
     val metricSignals: Map<SamsungHealthMetric, WearableSignal> = emptyMap(),
+    val samsungPolicyBlocked: Boolean = false,
+    val samsungStatusMessage: String? = null,
+    val representativeSleepHours: Float? = null,
+    val representativeDailySteps: Int? = null,
+    val wearableStressLevel: Int? = null,
     val sleepHours: Float = 7f,
     val dailySteps: Int = 8000,
     val stressLevel: Int = 5,
@@ -51,10 +58,10 @@ data class OnboardingUiState(
         get() = grantedMetrics.containsAll(SamsungHealthMetric.entries)
 
     val needsSleepInput: Boolean
-        get() = metricSignals[SamsungHealthMetric.SLEEP] != WearableSignal.ACTIVE
+        get() = representativeSleepHours == null
 
     val needsStepsInput: Boolean
-        get() = metricSignals[SamsungHealthMetric.STEPS] != WearableSignal.ACTIVE
+        get() = representativeDailySteps == null
 
     val hasRecentWearableData: Boolean
         get() = metricSignals.values.any { it == WearableSignal.ACTIVE }
@@ -125,7 +132,36 @@ class OnboardingViewModel(
                 return@launch
             }
 
-            healthRepository.requestPermissions(activity)
+            when (healthRepository.requestPermissions(activity)) {
+                SamsungPermissionRequestResult.PolicyDenied -> {
+                    _uiState.update {
+                        it.copy(
+                            isPermissionsChecked = true,
+                            isCheckingHealthState = false,
+                            isSamsungHealthAvailable = true,
+                            samsungPolicyBlocked = true,
+                            samsungStatusMessage = "policy_blocked",
+                        )
+                    }
+                    return@launch
+                }
+
+                is SamsungPermissionRequestResult.Failed -> {
+                    _uiState.update {
+                        it.copy(
+                            isPermissionsChecked = true,
+                            isCheckingHealthState = false,
+                            isSamsungHealthAvailable = true,
+                            samsungPolicyBlocked = false,
+                            samsungStatusMessage = "request_failed",
+                        )
+                    }
+                    return@launch
+                }
+
+                SamsungPermissionRequestResult.Granted,
+                SamsungPermissionRequestResult.Denied -> Unit
+            }
             refreshHealthState()
         }
     }
@@ -134,15 +170,23 @@ class OnboardingViewModel(
         _uiState.update { it.copy(isCheckingHealthState = true) }
 
         val isAvailable = healthRepository.connectSamsung()
-        val grantedMetrics = if (isAvailable) {
-            healthRepository.grantedMetrics()
+        val permissionStatus = if (isAvailable) healthRepository.permissionStatus() else null
+        val grantedMetrics = (permissionStatus as? SamsungPermissionStatus.Success)?.grantedMetrics.orEmpty()
+        val metricSignals = if (grantedMetrics.isNotEmpty()) healthRepository.signalsByMetric() else emptyMap()
+        val representativeSleepHours = if (SamsungHealthMetric.SLEEP in grantedMetrics) {
+            healthRepository.representativeSleepHours()
         } else {
-            emptySet()
+            null
         }
-        val metricSignals = if (grantedMetrics.isNotEmpty()) {
-            healthRepository.signalsByMetric()
+        val representativeDailySteps = if (SamsungHealthMetric.STEPS in grantedMetrics) {
+            healthRepository.representativeDailySteps()
         } else {
-            emptyMap()
+            null
+        }
+        val wearableStressLevel = if (SamsungHealthMetric.STRESS in grantedMetrics) {
+            healthRepository.latestStressLevel()
+        } else {
+            null
         }
 
         _uiState.update {
@@ -152,6 +196,18 @@ class OnboardingViewModel(
                 isSamsungHealthAvailable = isAvailable,
                 grantedMetrics = grantedMetrics,
                 metricSignals = metricSignals,
+                samsungPolicyBlocked = permissionStatus == SamsungPermissionStatus.PolicyDenied,
+                samsungStatusMessage = when (permissionStatus) {
+                    SamsungPermissionStatus.PolicyDenied -> "policy_blocked"
+                    is SamsungPermissionStatus.Error -> permissionStatus.message
+                    else -> null
+                },
+                representativeSleepHours = representativeSleepHours,
+                representativeDailySteps = representativeDailySteps,
+                wearableStressLevel = wearableStressLevel,
+                sleepHours = representativeSleepHours ?: it.sleepHours,
+                dailySteps = representativeDailySteps ?: it.dailySteps,
+                stressLevel = wearableStressLevel ?: it.stressLevel,
             )
         }
     }

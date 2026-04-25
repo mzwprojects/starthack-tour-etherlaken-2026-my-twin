@@ -36,6 +36,7 @@ import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -49,6 +50,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mzwprojects.mytwin.R
@@ -71,6 +75,15 @@ fun HomeScreen(
     val state by vm.uiState.collectAsStateWithLifecycle()
     val primary = MaterialTheme.colorScheme.primary
     var activeEditor by remember { mutableStateOf<ManualMetricEditor?>(null) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) vm.refresh()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     Box(
         modifier = Modifier
@@ -166,7 +179,11 @@ fun HomeScreen(
                     value = state.sleepHours?.let {
                         stringResource(R.string.home_sleep_value, it)
                     } ?: stringResource(R.string.home_value_unavailable),
-                    description = stringResource(R.string.home_manual_sleep_description),
+                    description = if (state.sleepIsFromWearable) {
+                        stringResource(R.string.home_manual_sleep_description_context)
+                    } else {
+                        stringResource(R.string.home_manual_sleep_description)
+                    },
                     onEdit = { activeEditor = ManualMetricEditor.SLEEP },
                 )
                 Spacer(Modifier.height(12.dp))
@@ -178,7 +195,11 @@ fun HomeScreen(
                     value = state.stepsToday?.let {
                         stringResource(R.string.home_steps_value, it)
                     } ?: stringResource(R.string.home_value_unavailable),
-                    description = stringResource(R.string.home_manual_steps_description),
+                    description = if (state.stepsIsFromWearable) {
+                        stringResource(R.string.home_manual_steps_description_context)
+                    } else {
+                        stringResource(R.string.home_manual_steps_description)
+                    },
                     onEdit = { activeEditor = ManualMetricEditor.STEPS },
                 )
                 Spacer(Modifier.height(12.dp))
@@ -189,7 +210,11 @@ fun HomeScreen(
                 value = state.stressLevel?.let {
                     stringResource(R.string.home_stress_value, it)
                 } ?: stringResource(R.string.home_value_unavailable),
-                description = stringResource(R.string.home_manual_stress_description),
+                description = if (state.stressIsFromWearable) {
+                    stringResource(R.string.home_manual_stress_description_context)
+                } else {
+                    stringResource(R.string.home_manual_stress_description)
+                },
                 onEdit = { activeEditor = ManualMetricEditor.STRESS },
             )
 
@@ -350,7 +375,11 @@ private fun MetricGrid(state: HomeUiState) {
                 value = state.stressLevel?.let { stringResource(R.string.home_stress_value, it) }
                     ?: stringResource(R.string.home_value_unavailable),
                 source = if (state.stressLevel != null) {
-                    stringResource(R.string.home_source_manual)
+                    if (state.stressIsFromWearable) {
+                        stringResource(R.string.home_source_wearable)
+                    } else {
+                        stringResource(R.string.home_source_manual)
+                    }
                 } else {
                     null
                 },
