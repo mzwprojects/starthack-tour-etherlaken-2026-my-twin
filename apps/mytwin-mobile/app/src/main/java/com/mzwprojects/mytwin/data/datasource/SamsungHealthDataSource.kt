@@ -406,6 +406,7 @@ class SamsungHealthDataSource(context: Context) {
     ): List<Float> {
         val filter = LocalTimeFilter.of(start, end)
         return readWithSourceFallbacks(
+            label = "sleep",
             query = { sourceFilter ->
                 val builder = DataTypes.SLEEP.readDataRequestBuilder
                     .setLocalTimeFilter(filter)
@@ -432,6 +433,7 @@ class SamsungHealthDataSource(context: Context) {
     ): List<Float> {
         val filter = LocalTimeFilter.of(start, end)
         return readWithSourceFallbacks(
+            label = "heart_rate",
             query = { sourceFilter ->
                 val builder = DataTypes.HEART_RATE.readDataRequestBuilder
                     .setLocalTimeFilter(filter)
@@ -453,15 +455,26 @@ class SamsungHealthDataSource(context: Context) {
     }
 
     private suspend fun <T> readWithSourceFallbacks(
+        label: String,
         query: suspend (ReadSourceFilter?) -> List<T>,
     ): List<T> {
         for (sourceFilter in preferredSourceFilters) {
             val result = query(sourceFilter)
+            Log.d(
+                TAG,
+                "Query[$label] source=${describeSourceFilter(sourceFilter)} count=${result.size}",
+            )
             if (result.isNotEmpty()) {
                 return result
             }
         }
         return emptyList()
+    }
+
+    private fun describeSourceFilter(sourceFilter: ReadSourceFilter?): String {
+        if (sourceFilter == null) return "combined"
+        if (sourceFilter.isLocalDevice) return "local_device"
+        return sourceFilter.deviceType?.toString() ?: sourceFilter.appId ?: "custom"
     }
 
     private fun handleHealthDataException(

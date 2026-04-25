@@ -11,6 +11,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.LocalTime
 
@@ -55,6 +57,12 @@ class HomeViewModel(
             healthRepository.connectSamsung()
             userProfileRepository.profile.collect { profile ->
                 refreshSnapshot(profile)
+            }
+        }
+        viewModelScope.launch {
+            while (isActive) {
+                delay(5_000)
+                refreshSnapshot(_uiState.value.profile)
             }
         }
     }
