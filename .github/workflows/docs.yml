@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "docs/mytwin-mkdocs/**"
+      - ".github/workflows/docs.yml"
   workflow_dispatch:
 
 permissions:
