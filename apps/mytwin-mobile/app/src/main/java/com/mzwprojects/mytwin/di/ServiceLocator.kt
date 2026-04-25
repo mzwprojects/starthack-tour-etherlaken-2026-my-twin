@@ -1,6 +1,10 @@
 package com.mzwprojects.mytwin.di
 
 import android.content.Context
+import com.google.gson.Gson
+import com.mzwprojects.mytwin.chat.ChatRepository
+import com.mzwprojects.mytwin.chat.ClaudeApiService
+import com.mzwprojects.mytwin.chat.ClaudeContextBuilder
 import com.mzwprojects.mytwin.data.datasource.OnboardingDataSource
 import com.mzwprojects.mytwin.data.datasource.SamsungHealthDataSource
 import com.mzwprojects.mytwin.data.datasource.UserProfileDataSource
@@ -39,6 +43,10 @@ object ServiceLocator {
         SamsungHealthDataSource(requireContext())
     }
 
+    val gson: Gson by lazy {
+        Gson()
+    }
+
     // ─── Repositories ────────────────────────────────────────────────────
     val onboardingRepository: OnboardingRepository by lazy {
         OnboardingRepository(onboardingDataSource)
@@ -61,6 +69,24 @@ object ServiceLocator {
             userProfileRepository,
             healthRepository,
             simulationEngine,
+        )
+    }
+
+    val claudeContextBuilder: ClaudeContextBuilder by lazy {
+        ClaudeContextBuilder()
+    }
+
+    val claudeApiService: ClaudeApiService by lazy {
+        ClaudeApiService(gson)
+    }
+
+    val chatRepository: ChatRepository by lazy {
+        ChatRepository(
+            userProfileRepository = userProfileRepository,
+            healthRepository = healthRepository,
+            simulationRepository = simulationRepository,
+            contextBuilder = claudeContextBuilder,
+            apiService = claudeApiService,
         )
     }
 }

@@ -151,10 +151,14 @@
     <string name="home_manual_stress_dialog_title">Override current stress</string>
 
     <string name="chat_title">Your Digital Twin</string>
+    <string name="chat_subtitle">Ask about your trajectory, habits, or what-if changes.</string>
     <string name="chat_back">Back</string>
-    <string name="chat_coming_soon_eyebrow">YOUR DIGITAL TWIN</string>
-    <string name="chat_coming_soon_title">Chat is coming soon.</string>
-    <string name="chat_coming_soon_body">Real-time conversation with your AI health twin is on its way. Your profile is already being built in the background.</string>
+    <string name="chat_input_hint">Ask your twin something...</string>
+    <string name="chat_send">Send</string>
+    <string name="chat_sending">Thinking...</string>
+    <string name="chat_thinking">Thinking...</string>
+    <string name="chat_streaming_label">responding</string>
+    <string name="chat_error_dismiss">Dismiss</string>
     <string name="food_scan_back">Back</string>
     <string name="food_scan_coming_soon_eyebrow">YOUR FOOD SCANNER</string>
     <string name="food_scan_coming_soon_title">Food scanning is coming soon.</string>

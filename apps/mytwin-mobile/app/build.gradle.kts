@@ -1,8 +1,20 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
 }
+
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) {
+        file.inputStream().use(::load)
+    }
+}
+
+fun String.escapeForBuildConfig(): String =
+    replace("\\", "\\\\").replace("\"", "\\\"")
 
 android {
     namespace = "com.mzwprojects.mytwin"
@@ -20,6 +32,16 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField(
+            "String",
+            "CLAUDE_API_KEY",
+            "\"${(localProperties.getProperty("claudeApiKey") ?: "").escapeForBuildConfig()}\"",
+        )
+        buildConfigField(
+            "String",
+            "CLAUDE_MODEL",
+            "\"${(localProperties.getProperty("claudeModel") ?: "claude-sonnet-4-20250514").escapeForBuildConfig()}\"",
+        )
     }
 
     buildTypes {
@@ -37,6 +59,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
