@@ -46,38 +46,40 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.mzwprojects.mytwin.R
 import com.mzwprojects.mytwin.ui.theme.VitalBright
 import kotlinx.coroutines.launch
 
 // ─── Model ───────────────────────────────────────────────────────────────────
 
 private data class OnboardingPage(
-    val eyebrow: String,
-    val headline: String,
-    val body: String,
+    val eyebrowRes: Int,
+    val headlineRes: Int,
+    val bodyRes: Int,
     val illustration: @Composable (Float) -> Unit,
 )
 
 private val pages: List<OnboardingPage> = listOf(
     OnboardingPage(
-        eyebrow = "YOUR STARTING POINT",
-        headline = "This is you today.",
-        body = "Your habits, your sleep, your stress — they're all quietly shaping a future version of you. It's time to meet them.",
+        eyebrowRes = R.string.welcome_page1_eyebrow,
+        headlineRes = R.string.welcome_page1_headline,
+        bodyRes = R.string.welcome_page1_body,
         illustration = { pulse -> TwinPulseIllustration(pulse) },
     ),
     OnboardingPage(
-        eyebrow = "YOUR TRAJECTORY",
-        headline = "This is where\nyou're heading.",
-        body = "Based on how you live right now, your digital twin projects health outcomes decades into the future. Some of them might surprise you.",
+        eyebrowRes = R.string.welcome_page2_eyebrow,
+        headlineRes = R.string.welcome_page2_headline,
+        bodyRes = R.string.welcome_page2_body,
         illustration = { _ -> TrajectoryIllustration() },
     ),
     OnboardingPage(
-        eyebrow = "YOUR CHOICE",
-        headline = "You can change\nthe outcome.",
-        body = "Ask your twin anything. Adjust one habit, watch the future shift. Every small decision ripples forward — and now you'll see exactly how.",
+        eyebrowRes = R.string.welcome_page3_eyebrow,
+        headlineRes = R.string.welcome_page3_headline,
+        bodyRes = R.string.welcome_page3_body,
         illustration = { _ -> ForkIllustration() },
     ),
 )
@@ -130,7 +132,7 @@ fun WelcomeScreen(onFinished: () -> Unit) {
         ) {
             TextButton(onClick = onFinished) {
                 Text(
-                    text = "Skip",
+                    text = stringResource(R.string.action_skip),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -183,7 +185,10 @@ fun WelcomeScreen(onFinished: () -> Unit) {
                     ),
                 ) {
                     Text(
-                        text = if (lastPage) "Begin Your Journey" else "Next",
+                        text = stringResource(
+                            if (lastPage) R.string.welcome_cta_begin
+                            else R.string.action_next,
+                        ),
                         style = MaterialTheme.typography.titleMedium,
                     )
                 }
@@ -220,7 +225,7 @@ private fun PageContent(
 
         // Eyebrow
         Text(
-            text = page.eyebrow,
+            text = stringResource(page.eyebrowRes),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.primary,
             textAlign = TextAlign.Center,
@@ -230,7 +235,7 @@ private fun PageContent(
 
         // Headline
         Text(
-            text = page.headline,
+            text = stringResource(page.headlineRes),
             style = MaterialTheme.typography.headlineMedium,
             color = MaterialTheme.colorScheme.onBackground,
             textAlign = TextAlign.Center,
@@ -240,7 +245,7 @@ private fun PageContent(
 
         // Body
         Text(
-            text = page.body,
+            text = stringResource(page.bodyRes),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
