@@ -77,6 +77,7 @@ private enum class ManualMetricEditor {
 fun HomeScreen(
     onChatClicked: () -> Unit,
     onFoodScanClicked: () -> Unit,
+    onSimulationClicked: () -> Unit,
     vm: HomeViewModel = viewModel(),
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
@@ -188,6 +189,33 @@ fun HomeScreen(
                 }
             }
 
+            Spacer(Modifier.height(24.dp))
+
+            Text(
+                text = stringResource(R.string.home_simulation_title),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Spacer(Modifier.height(8.dp))
+            OutlinedCard(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.home_simulation_body),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Button(
+                        onClick = onSimulationClicked,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(text = stringResource(R.string.home_simulation_cta))
+                    }
+                }
+            }
+
             if (state.isViewingToday) {
                 Spacer(Modifier.height(24.dp))
 
@@ -274,7 +302,7 @@ fun HomeScreen(
                 }
             }
 
-            Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(24.dp))
 
             Button(
                 onClick = onChatClicked,

@@ -128,6 +128,9 @@
     <string name="home_chat_cta">Chat with Your Twin</string>
     <string name="home_food_scan_label">Food Scanner</string>
     <string name="home_food_coming_soon">Coming soon</string>
+    <string name="home_simulation_title">Simulation</string>
+    <string name="home_simulation_body">See how your recent health pattern is trending, what likely helps over the next days, and which changes could improve the longer trajectory.</string>
+    <string name="home_simulation_cta">Simulation</string>
     <string name="home_value_unavailable">-</string>
     <string name="home_sleep_value">%1$.1f h</string>
     <string name="home_steps_value">%1$,d steps</string>
@@ -156,4 +159,20 @@
     <string name="food_scan_coming_soon_eyebrow">YOUR FOOD SCANNER</string>
     <string name="food_scan_coming_soon_title">Food scanning is coming soon.</string>
     <string name="food_scan_coming_soon_body">Camera-based nutrition capture is on its way. Soon your twin will be able to factor meals into the bigger health picture.</string>
+    <string name="simulation_back">Back</string>
+    <string name="simulation_eyebrow">YOUR TRAJECTORY</string>
+    <string name="simulation_title">Simulation</string>
+    <string name="simulation_subtitle">A rule-based projection based on your recent wearable and profile data. It is meant as a coaching-style estimate, not a medical diagnosis.</string>
+    <string name="simulation_loading">Calculating your trajectory...</string>
+    <string name="simulation_error_title">Simulation unavailable</string>
+    <string name="simulation_retry">Try again</string>
+    <string name="simulation_short_term_title">Next few days</string>
+    <string name="simulation_recommendations_title">What to improve</string>
+    <string name="simulation_long_term_title">If you keep going like this</string>
+    <string name="simulation_scenarios_title">What-if scenarios</string>
+    <string name="simulation_score_recovery">Recovery</string>
+    <string name="simulation_score_energy">Energy</string>
+    <string name="simulation_score_focus">Focus</string>
+    <string name="simulation_score_strain">Strain</string>
+    <string name="simulation_score_long_term_risk">Long-term risk</string>
 </resources>

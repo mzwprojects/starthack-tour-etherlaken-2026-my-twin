@@ -7,6 +7,8 @@ import com.mzwprojects.mytwin.data.datasource.UserProfileDataSource
 import com.mzwprojects.mytwin.data.repository.HealthRepository
 import com.mzwprojects.mytwin.data.repository.OnboardingRepository
 import com.mzwprojects.mytwin.data.repository.UserProfileRepository
+import com.mzwprojects.mytwin.simulation.SimulationEngine
+import com.mzwprojects.mytwin.simulation.SimulationRepository
 
 /**
  * Lightweight manual dependency container.
@@ -48,5 +50,17 @@ object ServiceLocator {
 
     val healthRepository: HealthRepository by lazy {
         HealthRepository(samsungHealthDataSource)
+    }
+
+    val simulationEngine: SimulationEngine by lazy {
+        SimulationEngine()
+    }
+
+    val simulationRepository: SimulationRepository by lazy {
+        SimulationRepository(
+            userProfileRepository,
+            healthRepository,
+            simulationEngine,
+        )
     }
 }

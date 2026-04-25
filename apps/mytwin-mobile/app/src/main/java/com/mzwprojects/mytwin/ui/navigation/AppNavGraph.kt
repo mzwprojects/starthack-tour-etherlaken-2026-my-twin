@@ -9,6 +9,7 @@ import com.mzwprojects.mytwin.ui.screens.ChatScreen
 import com.mzwprojects.mytwin.ui.screens.FoodScanScreen
 import com.mzwprojects.mytwin.ui.screens.HomeScreen
 import com.mzwprojects.mytwin.ui.screens.OnboardingScreen
+import com.mzwprojects.mytwin.ui.screens.SimulationScreen
 import com.mzwprojects.mytwin.ui.screens.WelcomeScreen
 
 object Routes {
@@ -17,6 +18,7 @@ object Routes {
     const val HOME = "home"
     const val CHAT = "chat"
     const val FOOD_SCAN = "food_scan"
+    const val SIMULATION = "simulation"
 }
 
 @Composable
@@ -52,6 +54,7 @@ fun AppNavGraph(
             HomeScreen(
                 onChatClicked = { navController.navigate(Routes.CHAT) },
                 onFoodScanClicked = { navController.navigate(Routes.FOOD_SCAN) },
+                onSimulationClicked = { navController.navigate(Routes.SIMULATION) },
             )
         }
 
@@ -63,6 +66,12 @@ fun AppNavGraph(
 
         composable(Routes.FOOD_SCAN) {
             FoodScanScreen(
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(Routes.SIMULATION) {
+            SimulationScreen(
                 onBack = { navController.popBackStack() },
             )
         }
