@@ -3,10 +3,14 @@ package com.mzwprojects.mytwin.ui.viewmodels
 import android.app.Activity
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mzwprojects.mytwin.data.datasource.SamsungHealthMetric
+import com.mzwprojects.mytwin.data.datasource.SamsungPermissionRequestResult
+import com.mzwprojects.mytwin.data.datasource.SamsungPermissionStatus
 import com.mzwprojects.mytwin.data.model.BiologicalSex
 import com.mzwprojects.mytwin.data.model.DietQuality
 import com.mzwprojects.mytwin.data.model.SmokingStatus
 import com.mzwprojects.mytwin.data.model.UserProfile
+import com.mzwprojects.mytwin.data.model.WearableSignal
 import com.mzwprojects.mytwin.data.repository.HealthRepository
 import com.mzwprojects.mytwin.data.repository.OnboardingRepository
 import com.mzwprojects.mytwin.data.repository.UserProfileRepository
@@ -21,37 +25,46 @@ enum class OnboardingStep { PROFILE, PERMISSIONS, MANUAL_DATA, HABITS, REVIEW }
 
 data class OnboardingUiState(
     val currentStep: OnboardingStep = OnboardingStep.PROFILE,
-    // Profile
     val displayName: String = "",
     val ageInput: String = "",
     val biologicalSex: BiologicalSex? = null,
     val heightInput: String = "",
     val weightInput: String = "",
-    // Permissions — Samsung Health
     val isPermissionsChecked: Boolean = false,
-    val isSamsungHealthConnected: Boolean = false,
-    val allPermissionsGranted: Boolean = false,
-    val isLoadingSignals: Boolean = false,
-    // Manual data
+    val isCheckingHealthState: Boolean = false,
+    val isSamsungHealthAvailable: Boolean = false,
+    val grantedMetrics: Set<SamsungHealthMetric> = emptySet(),
+    val metricSignals: Map<SamsungHealthMetric, WearableSignal> = emptyMap(),
+    val samsungPolicyBlocked: Boolean = false,
+    val samsungStatusMessage: String? = null,
+    val representativeSleepHours: Float? = null,
+    val representativeDailySteps: Int? = null,
+    val wearableStressLevel: Int? = null,
     val sleepHours: Float = 7f,
     val dailySteps: Int = 8000,
     val stressLevel: Int = 5,
-    // Habits
     val smokingStatus: SmokingStatus = SmokingStatus.NEVER,
     val alcoholDrinksPerWeek: Int = 2,
     val dietQuality: DietQuality = DietQuality.AVERAGE,
-    // Submit
     val isSubmitting: Boolean = false,
 ) {
     val isProfileValid: Boolean
         get() = ageInput.toIntOrNull() != null &&
-                heightInput.toIntOrNull() != null &&
-                weightInput.toFloatOrNull() != null &&
-                biologicalSex != null
+            heightInput.toIntOrNull() != null &&
+            weightInput.toFloatOrNull() != null &&
+            biologicalSex != null
 
-    val needsSleepInput: Boolean get() = !allPermissionsGranted
-    val needsStepsInput: Boolean get() = !allPermissionsGranted
-    val allWearableCovered: Boolean get() = allPermissionsGranted
+    val allPermissionsGranted: Boolean
+        get() = grantedMetrics.containsAll(SamsungHealthMetric.entries)
+
+    val needsSleepInput: Boolean
+        get() = representativeSleepHours == null
+
+    val needsStepsInput: Boolean
+        get() = representativeDailySteps == null
+
+    val hasRecentWearableData: Boolean
+        get() = metricSignals.values.any { it == WearableSignal.ACTIVE }
 }
 
 class OnboardingViewModel(
@@ -63,129 +76,172 @@ class OnboardingViewModel(
     private val _uiState = MutableStateFlow(OnboardingUiState())
     val uiState: StateFlow<OnboardingUiState> = _uiState.asStateFlow()
 
-    // ─── Navigation ──────────────────────────────────────────────────────
-
     fun advance() {
-        val next = when (_uiState.value.currentStep) {
+        val nextStep = when (_uiState.value.currentStep) {
             OnboardingStep.PROFILE -> OnboardingStep.PERMISSIONS
             OnboardingStep.PERMISSIONS -> OnboardingStep.MANUAL_DATA
             OnboardingStep.MANUAL_DATA -> OnboardingStep.HABITS
             OnboardingStep.HABITS -> OnboardingStep.REVIEW
-            OnboardingStep.REVIEW -> _uiState.value.currentStep
+            OnboardingStep.REVIEW -> OnboardingStep.REVIEW
         }
-        _uiState.update { it.copy(currentStep = next) }
-        if (next == OnboardingStep.PERMISSIONS && !_uiState.value.isPermissionsChecked) {
-            viewModelScope.launch { loadPermissionsState() }
+
+        _uiState.update { it.copy(currentStep = nextStep) }
+
+        if (nextStep == OnboardingStep.PERMISSIONS && !_uiState.value.isPermissionsChecked) {
+            viewModelScope.launch { refreshHealthState() }
         }
     }
 
     fun back() {
         _uiState.update {
-            it.copy(currentStep = when (it.currentStep) {
-                OnboardingStep.PROFILE -> it.currentStep
-                OnboardingStep.PERMISSIONS -> OnboardingStep.PROFILE
-                OnboardingStep.MANUAL_DATA -> OnboardingStep.PERMISSIONS
-                OnboardingStep.HABITS -> OnboardingStep.MANUAL_DATA
-                OnboardingStep.REVIEW -> OnboardingStep.HABITS
-            })
-        }
-    }
-
-    // ─── Permissions step — Samsung Health ───────────────────────────────
-
-    private suspend fun loadPermissionsState() {
-        val connected = healthRepository.connectSamsung()
-        val granted = connected && healthRepository.areAllPermissionsGranted()
-        _uiState.update {
             it.copy(
-                isPermissionsChecked = true,
-                isSamsungHealthConnected = connected,
-                allPermissionsGranted = granted,
+                currentStep = when (it.currentStep) {
+                    OnboardingStep.PROFILE -> OnboardingStep.PROFILE
+                    OnboardingStep.PERMISSIONS -> OnboardingStep.PROFILE
+                    OnboardingStep.MANUAL_DATA -> OnboardingStep.PERMISSIONS
+                    OnboardingStep.HABITS -> OnboardingStep.MANUAL_DATA
+                    OnboardingStep.REVIEW -> OnboardingStep.HABITS
+                },
             )
         }
     }
 
     fun refreshPermissions() {
         viewModelScope.launch {
-            if (_uiState.value.currentStep != OnboardingStep.PERMISSIONS) return@launch
-            if (!_uiState.value.isSamsungHealthConnected) return@launch
-
-            val granted = healthRepository.areAllPermissionsGranted()
-
-            _uiState.update {
-                it.copy(
-                    isPermissionsChecked = true,
-                    allPermissionsGranted = granted,
-                )
+            if (_uiState.value.currentStep == OnboardingStep.PERMISSIONS) {
+                refreshHealthState()
             }
         }
     }
 
     fun requestPermissions(activity: Activity) {
         viewModelScope.launch {
-            if (!_uiState.value.isSamsungHealthConnected) {
+            _uiState.update { it.copy(isCheckingHealthState = true) }
+
+            val isAvailable = healthRepository.connectSamsung()
+            if (!isAvailable) {
                 _uiState.update {
                     it.copy(
                         isPermissionsChecked = true,
-                        isSamsungHealthConnected = false,
-                        allPermissionsGranted = false,
+                        isCheckingHealthState = false,
+                        isSamsungHealthAvailable = false,
+                        grantedMetrics = emptySet(),
+                        metricSignals = emptyMap(),
                     )
                 }
                 return@launch
             }
 
-            healthRepository.requestPermissions(activity)
+            when (healthRepository.requestPermissions(activity)) {
+                SamsungPermissionRequestResult.PolicyDenied -> {
+                    _uiState.update {
+                        it.copy(
+                            isPermissionsChecked = true,
+                            isCheckingHealthState = false,
+                            isSamsungHealthAvailable = true,
+                            samsungPolicyBlocked = true,
+                            samsungStatusMessage = "policy_blocked",
+                        )
+                    }
+                    return@launch
+                }
 
-            val granted = healthRepository.areAllPermissionsGranted()
+                is SamsungPermissionRequestResult.Failed -> {
+                    _uiState.update {
+                        it.copy(
+                            isPermissionsChecked = true,
+                            isCheckingHealthState = false,
+                            isSamsungHealthAvailable = true,
+                            samsungPolicyBlocked = false,
+                            samsungStatusMessage = "request_failed",
+                        )
+                    }
+                    return@launch
+                }
 
-            _uiState.update {
-                it.copy(
-                    isPermissionsChecked = true,
-                    allPermissionsGranted = granted,
-                )
+                SamsungPermissionRequestResult.Granted,
+                SamsungPermissionRequestResult.Denied -> Unit
             }
+            refreshHealthState()
         }
     }
 
-    // ─── Profile step ────────────────────────────────────────────────────
+    private suspend fun refreshHealthState() {
+        _uiState.update { it.copy(isCheckingHealthState = true) }
 
-    fun setDisplayName(v: String) = _uiState.update { it.copy(displayName = v) }
-    fun setAge(v: String) = _uiState.update { it.copy(ageInput = v) }
-    fun setBiologicalSex(v: BiologicalSex) = _uiState.update { it.copy(biologicalSex = v) }
-    fun setHeight(v: String) = _uiState.update { it.copy(heightInput = v) }
-    fun setWeight(v: String) = _uiState.update { it.copy(weightInput = v) }
+        val isAvailable = healthRepository.connectSamsung()
+        val permissionStatus = if (isAvailable) healthRepository.permissionStatus() else null
+        val grantedMetrics = (permissionStatus as? SamsungPermissionStatus.Success)?.grantedMetrics.orEmpty()
+        val metricSignals = if (grantedMetrics.isNotEmpty()) healthRepository.signalsByMetric() else emptyMap()
+        val representativeSleepHours = if (SamsungHealthMetric.SLEEP in grantedMetrics) {
+            healthRepository.representativeSleepHours()
+        } else {
+            null
+        }
+        val representativeDailySteps = if (SamsungHealthMetric.STEPS in grantedMetrics) {
+            healthRepository.representativeDailySteps()
+        } else {
+            null
+        }
+        val wearableStressLevel = if (SamsungHealthMetric.STRESS in grantedMetrics) {
+            healthRepository.latestStressLevel()
+        } else {
+            null
+        }
 
-    // ─── Manual data step ────────────────────────────────────────────────
+        _uiState.update {
+            it.copy(
+                isPermissionsChecked = true,
+                isCheckingHealthState = false,
+                isSamsungHealthAvailable = isAvailable,
+                grantedMetrics = grantedMetrics,
+                metricSignals = metricSignals,
+                samsungPolicyBlocked = permissionStatus == SamsungPermissionStatus.PolicyDenied,
+                samsungStatusMessage = when (permissionStatus) {
+                    SamsungPermissionStatus.PolicyDenied -> "policy_blocked"
+                    is SamsungPermissionStatus.Error -> permissionStatus.message
+                    else -> null
+                },
+                representativeSleepHours = representativeSleepHours,
+                representativeDailySteps = representativeDailySteps,
+                wearableStressLevel = wearableStressLevel,
+                sleepHours = representativeSleepHours ?: it.sleepHours,
+                dailySteps = representativeDailySteps ?: it.dailySteps,
+                stressLevel = wearableStressLevel ?: it.stressLevel,
+            )
+        }
+    }
 
-    fun setSleepHours(v: Float) = _uiState.update { it.copy(sleepHours = v) }
-    fun setDailySteps(v: Int) = _uiState.update { it.copy(dailySteps = v) }
-    fun setStressLevel(v: Int) = _uiState.update { it.copy(stressLevel = v) }
-
-    // ─── Habits step ─────────────────────────────────────────────────────
-
-    fun setSmokingStatus(v: SmokingStatus) = _uiState.update { it.copy(smokingStatus = v) }
-    fun setAlcohol(v: Int) = _uiState.update { it.copy(alcoholDrinksPerWeek = v) }
-    fun setDietQuality(v: DietQuality) = _uiState.update { it.copy(dietQuality = v) }
-
-    // ─── Submit ──────────────────────────────────────────────────────────
+    fun setDisplayName(value: String) = _uiState.update { it.copy(displayName = value) }
+    fun setAge(value: String) = _uiState.update { it.copy(ageInput = value) }
+    fun setBiologicalSex(value: BiologicalSex) = _uiState.update { it.copy(biologicalSex = value) }
+    fun setHeight(value: String) = _uiState.update { it.copy(heightInput = value) }
+    fun setWeight(value: String) = _uiState.update { it.copy(weightInput = value) }
+    fun setSleepHours(value: Float) = _uiState.update { it.copy(sleepHours = value) }
+    fun setDailySteps(value: Int) = _uiState.update { it.copy(dailySteps = value) }
+    fun setStressLevel(value: Int) = _uiState.update { it.copy(stressLevel = value) }
+    fun setSmokingStatus(value: SmokingStatus) = _uiState.update { it.copy(smokingStatus = value) }
+    fun setAlcohol(value: Int) = _uiState.update { it.copy(alcoholDrinksPerWeek = value) }
+    fun setDietQuality(value: DietQuality) = _uiState.update { it.copy(dietQuality = value) }
 
     fun submit(onComplete: () -> Unit) {
-        val s = _uiState.value
+        val state = _uiState.value
         _uiState.update { it.copy(isSubmitting = true) }
+
         viewModelScope.launch {
             userProfileRepository.update {
                 UserProfile(
-                    displayName = s.displayName.ifBlank { null },
-                    ageYears = s.ageInput.toIntOrNull(),
-                    biologicalSex = s.biologicalSex,
-                    heightCm = s.heightInput.toIntOrNull(),
-                    weightKg = s.weightInput.toFloatOrNull(),
-                    averageSleepHours = if (s.needsSleepInput) s.sleepHours else null,
-                    averageDailySteps = if (s.needsStepsInput) s.dailySteps else null,
-                    perceivedStressLevel = s.stressLevel,
-                    smokingStatus = s.smokingStatus,
-                    alcoholDrinksPerWeek = s.alcoholDrinksPerWeek,
-                    dietQuality = s.dietQuality,
+                    displayName = state.displayName.ifBlank { null },
+                    ageYears = state.ageInput.toIntOrNull(),
+                    biologicalSex = state.biologicalSex,
+                    heightCm = state.heightInput.toIntOrNull(),
+                    weightKg = state.weightInput.toFloatOrNull(),
+                    averageSleepHours = if (state.needsSleepInput) state.sleepHours else null,
+                    averageDailySteps = if (state.needsStepsInput) state.dailySteps else null,
+                    perceivedStressLevel = state.stressLevel,
+                    smokingStatus = state.smokingStatus,
+                    alcoholDrinksPerWeek = state.alcoholDrinksPerWeek,
+                    dietQuality = state.dietQuality,
                     onboardingCompletedAtEpochMs = System.currentTimeMillis(),
                 )
             }

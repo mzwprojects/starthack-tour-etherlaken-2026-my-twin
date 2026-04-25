@@ -8,8 +8,9 @@ import kotlinx.serialization.Serializable
  * All numeric fields are nullable. `null` means "not yet provided" — never
  * conflate `null` with `0`. Concrete defaults live in the UI layer.
  *
- * Manual entries (e.g. [averageSleepHours]) are only used when the corresponding
- * Health Connect metric is *not* [WearableSignal.ACTIVE].
+ * Manual entries (e.g. [averageSleepHours]) are baseline context values.
+ * `current*Override` values are explicit user corrections for the currently
+ * displayed home-screen metrics and take precedence over synced wearable data.
  */
 @Serializable
 data class UserProfile(
@@ -24,6 +25,10 @@ data class UserProfile(
     val averageSleepHours: Float? = null,
     val averageDailySteps: Int? = null,
     val perceivedStressLevel: Int? = null, // 1..10
+    val currentSleepHoursOverride: Float? = null,
+    val currentStepsOverride: Int? = null,
+    val currentHeartRateOverride: Int? = null,
+    val currentStressLevelOverride: Int? = null, // 1..10
 
     // ─── Habits (always manual) ──────────────────────────────────────────
     val smokingStatus: SmokingStatus? = null,

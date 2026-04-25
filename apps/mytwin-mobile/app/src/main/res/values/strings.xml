@@ -1,71 +1,78 @@
 <resources>
     <string name="app_name">MyTwin</string>
 
-    <!-- ─── Common ─────────────────────────────────────────────────────── -->
     <string name="action_skip">Skip</string>
     <string name="action_next">Next</string>
     <string name="action_back">Back</string>
     <string name="action_continue">Continue</string>
+    <string name="action_save">Save</string>
+    <string name="action_cancel">Cancel</string>
 
-    <!-- ─── Welcome / Intro pager ──────────────────────────────────────── -->
     <string name="welcome_cta_begin">Begin Your Journey</string>
-
     <string name="welcome_page1_eyebrow">YOUR STARTING POINT</string>
     <string name="welcome_page1_headline">This is you today.</string>
-    <string name="welcome_page1_body">Your habits, your sleep, your stress — they\'re all quietly shaping a future version of you. It\'s time to meet them.</string>
-
+    <string name="welcome_page1_body">Your habits, your sleep, your stress. They are all quietly shaping a future version of you. It is time to meet them.</string>
     <string name="welcome_page2_eyebrow">YOUR TRAJECTORY</string>
-    <string name="welcome_page2_headline">This is where\nyou\'re heading.</string>
+    <string name="welcome_page2_headline">This is where\nyou are heading.</string>
     <string name="welcome_page2_body">Based on how you live right now, your digital twin projects health outcomes decades into the future. Some of them might surprise you.</string>
-
     <string name="welcome_page3_eyebrow">YOUR CHOICE</string>
     <string name="welcome_page3_headline">You can change\nthe outcome.</string>
-    <string name="welcome_page3_body">Ask your twin anything. Adjust one habit, watch the future shift. Every small decision ripples forward — and now you\'ll see exactly how.</string>
+    <string name="welcome_page3_body">Ask your twin anything. Adjust one habit, watch the future shift. Every small decision ripples forward and now you will see exactly how.</string>
 
-    <!-- ─── Onboarding ─────────────────────────────────────────────────── -->
     <string name="onboarding_step_counter">%1$d of %2$d</string>
-
-    <!-- Profile step -->
     <string name="onboarding_profile_title">About you</string>
-    <string name="onboarding_profile_subtitle">A few basics so your twin knows who it\'s simulating.</string>
+    <string name="onboarding_profile_subtitle">A few basics so your twin knows who it is simulating.</string>
     <string name="onboarding_name_label">Name (optional)</string>
     <string name="onboarding_name_hint">How should your twin call you?</string>
     <string name="onboarding_age_label">Age</string>
-    <string name="onboarding_height_label">Height (cm)</string>
-    <string name="onboarding_weight_label">Weight (kg)</string>
+    <string name="onboarding_height_label">Height</string>
+    <string name="onboarding_weight_label">Weight</string>
     <string name="onboarding_sex_label">Biological sex</string>
 
-    <!-- Permissions step -->
     <string name="onboarding_permissions_title">Your health data</string>
-    <string name="onboarding_permissions_subtitle">Connect Samsung Health so your twin can read real wearable data. Nothing leaves this device.</string>
+    <string name="onboarding_permissions_subtitle">Connect Samsung Health so your twin can read your Galaxy Watch data on this phone. Nothing leaves this device.</string>
     <string name="onboarding_permissions_grant">Connect Samsung Health</string>
-    <string name="onboarding_permissions_skip">Skip for now</string>
-    <string name="onboarding_permissions_granted">Samsung Health connected ✓</string>
-    <string name="onboarding_samsung_not_connected">Could not connect to Samsung Health. Make sure the Samsung Health app is installed and up to date.</string>
+    <string name="onboarding_permissions_retry">Try Again</string>
+    <string name="onboarding_permissions_skip">Continue Without Sync</string>
+    <string name="onboarding_permissions_granted">Samsung Health is connected.</string>
+    <string name="onboarding_permissions_missing">Samsung Health is available, but some permissions are still missing.</string>
+    <string name="onboarding_samsung_not_connected">Could not connect to Samsung Health. Make sure Samsung Health is installed, updated, and developer mode or partner access is configured on this device.</string>
+    <string name="onboarding_samsung_policy_title">Samsung Health access is blocked by SDK policy.</string>
+    <string name="onboarding_samsung_policy_body">Samsung is rejecting this package before the user permission dialog can open. For local testing, enable Samsung Health developer mode and allow data read access for this exact package. For distribution, Samsung must register the package name and signing certificate.</string>
+    <string name="onboarding_metric_sleep">Sleep</string>
+    <string name="onboarding_metric_steps">Steps</string>
+    <string name="onboarding_metric_heart_rate">Heart rate</string>
+    <string name="onboarding_metric_stress">Stress (Energy Score)</string>
+    <string name="onboarding_metric_status_permission_needed">Permission needed</string>
+    <string name="onboarding_metric_status_active">Recent data found</string>
+    <string name="onboarding_metric_status_stale">Historical data only</string>
+    <string name="onboarding_metric_status_no_data">No data found yet</string>
+    <string name="onboarding_metric_status_unknown">Unknown</string>
 
-    <!-- Manual data step -->
     <string name="onboarding_manual_title">Fill in the gaps</string>
-    <string name="onboarding_manual_subtitle">Your wearable doesn\'t cover everything — help your twin with the rest.</string>
-    <string name="onboarding_manual_all_covered">Your wearable covers it all — nothing to fill in here.</string>
+    <string name="onboarding_manual_subtitle">If the wearable cannot provide fresh data yet, add a manual baseline so your twin still has something useful to work with.</string>
+    <string name="onboarding_manual_all_covered">Recent wearable data is available for sleep and steps. You can continue.</string>
     <string name="onboarding_sleep_label">Average sleep per night</string>
     <string name="onboarding_steps_label">Average daily steps</string>
     <string name="onboarding_stress_label">Perceived stress level</string>
     <string name="onboarding_stress_low">Low</string>
     <string name="onboarding_stress_high">High</string>
+    <string name="onboarding_sleep_value">%1$.1f %2$s</string>
+    <string name="onboarding_steps_value">%1$,d %2$s</string>
+    <string name="onboarding_stress_value">%1$d / 10</string>
+    <string name="onboarding_stress_proxy_note">Samsung Health currently provides an Energy Score based stress proxy. Current wearable-derived value: %1$d / 10.</string>
 
-    <!-- Habits step -->
     <string name="onboarding_habits_title">Your habits</string>
     <string name="onboarding_habits_subtitle">Honest answers make for a more accurate twin.</string>
     <string name="onboarding_smoking_label">Smoking</string>
-    <string name="onboarding_alcohol_label">Alcohol (drinks / week)</string>
+    <string name="onboarding_alcohol_label">Alcohol</string>
     <string name="onboarding_diet_label">Diet quality</string>
+    <string name="onboarding_alcohol_value">%1$d %2$s</string>
 
-    <!-- Review step -->
     <string name="onboarding_review_title">Your profile</string>
     <string name="onboarding_review_subtitle">This is what your twin starts with.</string>
-    <string name="onboarding_review_cta">Meet your twin →</string>
+    <string name="onboarding_review_cta">Meet your twin</string>
 
-    <!-- Enum labels -->
     <string name="sex_male">Male</string>
     <string name="sex_female">Female</string>
     <string name="sex_other">Other</string>
@@ -79,7 +86,6 @@
     <string name="diet_good">Good</string>
     <string name="diet_excellent">Excellent</string>
 
-    <!-- Review labels -->
     <string name="review_name">Name</string>
     <string name="review_age">Age</string>
     <string name="review_sex">Sex</string>
@@ -92,31 +98,19 @@
     <string name="review_alcohol">Alcohol</string>
     <string name="review_diet">Diet</string>
     <string name="review_not_set">Not set</string>
+    <string name="review_dash">-</string>
 
-    <!-- Units -->
     <string name="unit_years">years</string>
     <string name="unit_cm">cm</string>
     <string name="unit_kg">kg</string>
     <string name="unit_hours_night">h / night</string>
     <string name="unit_steps_day">steps / day</string>
-    <string name="unit_out_of_ten">/ 10</string>
     <string name="unit_drinks_week">drinks / week</string>
     <string name="unit_bpm">bpm</string>
 
-    <!-- ─── Onboarding – Health Connect availability ────────────────────── -->
-    <string name="onboarding_hc_unavailable_title">Health Connect not available</string>
-    <string name="onboarding_hc_unavailable_body">Install Health Connect to automatically sync data from your wearable. You can also skip and enter values manually.</string>
-    <string name="onboarding_hc_install">Get Health Connect</string>
-    <string name="onboarding_hc_needs_update_title">Health Connect needs an update</string>
-    <string name="onboarding_hc_needs_update_body">Update Health Connect to sync wearable data, or skip and enter values manually.</string>
-    <string name="onboarding_hc_update">Update Health Connect</string>
-    <string name="onboarding_hc_samsung_hint">On Samsung devices, open Samsung Health → Settings → Health permissions → Connect to Health Connect, then try again.</string>
-
-    <!-- ─── Home screen ─────────────────────────────────────────────────── -->
     <string name="home_greeting_morning">Good morning</string>
     <string name="home_greeting_afternoon">Good afternoon</string>
     <string name="home_greeting_evening">Good evening</string>
-    <string name="home_greeting_generic">Hello</string>
     <string name="home_today_eyebrow">YOUR HEALTH TODAY</string>
     <string name="home_snapshot_title">Today\'s snapshot</string>
     <string name="home_sleep_label">Sleep</string>
@@ -125,16 +119,36 @@
     <string name="home_stress_label">Stress</string>
     <string name="home_source_wearable">wearable</string>
     <string name="home_source_manual">manual</string>
-    <string name="home_nudge_message">Haven\'t seen data from your wearable in a few days. Wearing it lately?</string>
+    <string name="home_source_manual_override">manual override</string>
+    <string name="home_nudge_message">No recent Samsung Health data has synced in the last few days. Wearing the watch lately?</string>
     <string name="home_chat_cta">Chat with Your Twin</string>
     <string name="home_food_scan_label">Food Scanner</string>
     <string name="home_food_coming_soon">Coming soon</string>
-    <string name="home_value_unavailable">—</string>
+    <string name="home_value_unavailable">-</string>
+    <string name="home_sleep_value">%1$.1f h</string>
+    <string name="home_steps_value">%1$,d steps</string>
+    <string name="home_stress_value">%1$d / 10</string>
+    <string name="home_manual_tracking_title">Manual tracking</string>
+    <string name="home_manual_tracking_subtitle">Correct the currently displayed values when the wearable data is missing, delayed, or just wrong.</string>
+    <string name="home_manual_update">Override</string>
+    <string name="home_manual_clear">Clear</string>
+    <string name="home_manual_override_active">A manual override is active for the value currently shown on Home.</string>
+    <string name="home_manual_sleep_description">Override the current sleep value if the wearable missed a nap, partial night, or was not worn.</string>
+    <string name="home_manual_steps_description">Override the current steps value if today\'s synced count is delayed or inaccurate.</string>
+    <string name="home_manual_heartrate_description">Override the current heart rate if the latest synced reading is stale or missing.</string>
+    <string name="home_manual_stress_description">Override the current stress value if the wearable-derived value does not reflect today.</string>
+    <string name="home_manual_sleep_dialog_title">Override current sleep</string>
+    <string name="home_manual_steps_dialog_title">Override current steps</string>
+    <string name="home_manual_heartrate_dialog_title">Override current heart rate</string>
+    <string name="home_manual_stress_dialog_title">Override current stress</string>
 
-    <!-- ─── Chat screen ─────────────────────────────────────────────────── -->
     <string name="chat_title">Your Digital Twin</string>
     <string name="chat_back">Back</string>
     <string name="chat_coming_soon_eyebrow">YOUR DIGITAL TWIN</string>
     <string name="chat_coming_soon_title">Chat is coming soon.</string>
     <string name="chat_coming_soon_body">Real-time conversation with your AI health twin is on its way. Your profile is already being built in the background.</string>
+    <string name="food_scan_back">Back</string>
+    <string name="food_scan_coming_soon_eyebrow">YOUR FOOD SCANNER</string>
+    <string name="food_scan_coming_soon_title">Food scanning is coming soon.</string>
+    <string name="food_scan_coming_soon_body">Camera-based nutrition capture is on its way. Soon your twin will be able to factor meals into the bigger health picture.</string>
 </resources>

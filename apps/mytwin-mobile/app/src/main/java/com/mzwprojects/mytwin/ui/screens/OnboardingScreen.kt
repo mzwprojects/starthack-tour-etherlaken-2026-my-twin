@@ -54,9 +54,11 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mzwprojects.mytwin.R
+import com.mzwprojects.mytwin.data.datasource.SamsungHealthMetric
 import com.mzwprojects.mytwin.data.model.BiologicalSex
 import com.mzwprojects.mytwin.data.model.DietQuality
 import com.mzwprojects.mytwin.data.model.SmokingStatus
+import com.mzwprojects.mytwin.data.model.WearableSignal
 import com.mzwprojects.mytwin.ui.viewmodels.OnboardingStep
 import com.mzwprojects.mytwin.ui.viewmodels.OnboardingUiState
 import com.mzwprojects.mytwin.ui.viewmodels.OnboardingViewModel
@@ -70,10 +72,8 @@ fun OnboardingScreen(
     val state by vm.uiState.collectAsStateWithLifecycle()
     val primary = MaterialTheme.colorScheme.primary
     val context = LocalContext.current
-
-    // When the app returns to foreground (e.g. after Samsung Health permission dialog),
-    // re-check whether permissions were granted.
     val lifecycleOwner = LocalLifecycleOwner.current
+
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) vm.refreshPermissions()
@@ -102,13 +102,11 @@ fun OnboardingScreen(
                 .navigationBarsPadding()
                 .imePadding(),
         ) {
-            // ── Progress bar ─────────────────────────────────────────────────
             LinearProgressIndicator(
                 progress = { (state.currentStep.ordinal + 1f) / OnboardingStep.entries.size },
                 modifier = Modifier.fillMaxWidth(),
             )
 
-            // ── Step counter ─────────────────────────────────────────────────
             Text(
                 text = stringResource(
                     R.string.onboarding_step_counter,
@@ -122,7 +120,6 @@ fun OnboardingScreen(
                     .padding(horizontal = 24.dp, vertical = 8.dp),
             )
 
-            // ── Animated step content ────────────────────────────────────────
             AnimatedContent(
                 targetState = state.currentStep,
                 transitionSpec = { fadeIn() togetherWith fadeOut() },
@@ -141,7 +138,7 @@ fun OnboardingScreen(
                         OnboardingStep.PERMISSIONS -> PermissionsStep(
                             state = state,
                             onGrant = {
-                                context.findActivity()?.let { vm.requestPermissions(it) }
+                                context.findActivity()?.let(vm::requestPermissions)
                             },
                             onBack = vm::back,
                             onNext = vm::advance,
@@ -161,15 +158,13 @@ fun OnboardingScreen(
 }
 
 private fun Context.findActivity(): Activity? {
-    var ctx = this
-    while (ctx is ContextWrapper) {
-        if (ctx is Activity) return ctx
-        ctx = ctx.baseContext
+    var current = this
+    while (current is ContextWrapper) {
+        if (current is Activity) return current
+        current = current.baseContext
     }
     return null
 }
-
-// ─── Step: Profile ───────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -236,12 +231,14 @@ private fun ProfileStep(state: OnboardingUiState, vm: OnboardingViewModel) {
     Button(
         onClick = vm::advance,
         enabled = state.isProfileValid,
-        modifier = Modifier.fillMaxWidth().height(56.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp),
         shape = MaterialTheme.shapes.extraLarge,
-    ) { Text(stringResource(R.string.action_next)) }
+    ) {
+        Text(stringResource(R.string.action_next))
+    }
 }
-
-// ─── Step: Permissions ───────────────────────────────────────────────────────
 
 @Composable
 private fun PermissionsStep(
@@ -256,13 +253,18 @@ private fun PermissionsStep(
     )
 
     when {
-        !state.isPermissionsChecked -> {
+        !state.isPermissionsChecked || state.isCheckingHealthState -> {
             Box(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 24.dp),
                 contentAlignment = Alignment.Center,
-            ) { CircularProgressIndicator() }
+            ) {
+                CircularProgressIndicator()
+            }
         }
-        !state.isSamsungHealthConnected -> {
+
+        !state.isSamsungHealthAvailable -> {
             ElevatedCard(modifier = Modifier.fillMaxWidth()) {
                 Text(
                     text = stringResource(R.string.onboarding_samsung_not_connected),
@@ -271,56 +273,155 @@ private fun PermissionsStep(
                     modifier = Modifier.padding(20.dp),
                 )
             }
-            OutlinedButton(
-                onClick = onNext,
-                modifier = Modifier.fillMaxWidth().height(48.dp),
-                shape = MaterialTheme.shapes.extraLarge,
-            ) { Text(stringResource(R.string.onboarding_permissions_skip)) }
-        }
-        state.allPermissionsGranted -> {
-            ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = stringResource(R.string.onboarding_permissions_granted),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(20.dp),
-                )
-            }
-            Button(
-                onClick = onNext,
-                modifier = Modifier.fillMaxWidth().height(56.dp),
-                shape = MaterialTheme.shapes.extraLarge,
-            ) { Text(stringResource(R.string.action_continue)) }
-        }
-        else -> {
             Button(
                 onClick = onGrant,
-                modifier = Modifier.fillMaxWidth().height(56.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
                 shape = MaterialTheme.shapes.extraLarge,
-            ) { Text(stringResource(R.string.onboarding_permissions_grant)) }
+            ) {
+                Text(stringResource(R.string.onboarding_permissions_retry))
+            }
             OutlinedButton(
                 onClick = onNext,
-                modifier = Modifier.fillMaxWidth().height(48.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
                 shape = MaterialTheme.shapes.extraLarge,
-            ) { Text(stringResource(R.string.onboarding_permissions_skip)) }
-            Text(
-                text = stringResource(R.string.onboarding_hc_samsung_hint),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 4.dp),
-            )
+            ) {
+                Text(stringResource(R.string.onboarding_permissions_skip))
+            }
+        }
+
+        state.samsungPolicyBlocked -> {
+            ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.onboarding_samsung_policy_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    Text(
+                        text = stringResource(R.string.onboarding_samsung_policy_body),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            OutlinedButton(
+                onClick = onNext,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                shape = MaterialTheme.shapes.extraLarge,
+            ) {
+                Text(stringResource(R.string.onboarding_permissions_skip))
+            }
+        }
+
+        else -> {
+            ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Text(
+                        text = if (state.allPermissionsGranted) {
+                            stringResource(R.string.onboarding_permissions_granted)
+                        } else {
+                            stringResource(R.string.onboarding_permissions_missing)
+                        },
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    PermissionStatusRow(
+                        label = stringResource(R.string.onboarding_metric_sleep),
+                        signal = state.metricSignals[SamsungHealthMetric.SLEEP],
+                        isGranted = SamsungHealthMetric.SLEEP in state.grantedMetrics,
+                    )
+                    PermissionStatusRow(
+                        label = stringResource(R.string.onboarding_metric_steps),
+                        signal = state.metricSignals[SamsungHealthMetric.STEPS],
+                        isGranted = SamsungHealthMetric.STEPS in state.grantedMetrics,
+                    )
+                    PermissionStatusRow(
+                        label = stringResource(R.string.onboarding_metric_heart_rate),
+                        signal = state.metricSignals[SamsungHealthMetric.HEART_RATE],
+                        isGranted = SamsungHealthMetric.HEART_RATE in state.grantedMetrics,
+                    )
+                    PermissionStatusRow(
+                        label = stringResource(R.string.onboarding_metric_stress),
+                        signal = state.metricSignals[SamsungHealthMetric.STRESS],
+                        isGranted = SamsungHealthMetric.STRESS in state.grantedMetrics,
+                    )
+                }
+            }
+
+            if (!state.allPermissionsGranted) {
+                Button(
+                    onClick = onGrant,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    shape = MaterialTheme.shapes.extraLarge,
+                ) {
+                    Text(stringResource(R.string.onboarding_permissions_grant))
+                }
+            }
+
+            OutlinedButton(
+                onClick = onNext,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                shape = MaterialTheme.shapes.extraLarge,
+            ) {
+                Text(
+                    stringResource(
+                        if (state.allPermissionsGranted) {
+                            R.string.action_continue
+                        } else {
+                            R.string.onboarding_permissions_skip
+                        },
+                    ),
+                )
+            }
         }
     }
 
-    Spacer(Modifier.height(4.dp))
     OutlinedButton(
         onClick = onBack,
-        modifier = Modifier.fillMaxWidth().height(48.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(48.dp),
         shape = MaterialTheme.shapes.extraLarge,
-    ) { Text(stringResource(R.string.action_back)) }
+    ) {
+        Text(stringResource(R.string.action_back))
+    }
 }
 
-// ─── Step: Manual Data ───────────────────────────────────────────────────────
+@Composable
+private fun PermissionStatusRow(
+    label: String,
+    signal: WearableSignal?,
+    isGranted: Boolean,
+) {
+    ReviewRow(
+        label = label,
+        value = when {
+            !isGranted -> stringResource(R.string.onboarding_metric_status_permission_needed)
+            signal == WearableSignal.ACTIVE -> stringResource(R.string.onboarding_metric_status_active)
+            signal == WearableSignal.DEVICE_PRESENT_NOT_WORN_RECENTLY ->
+                stringResource(R.string.onboarding_metric_status_stale)
+            signal == WearableSignal.NO_DEVICE_LIKELY ->
+                stringResource(R.string.onboarding_metric_status_no_data)
+            else -> stringResource(R.string.onboarding_metric_status_unknown)
+        },
+    )
+}
 
 @Composable
 private fun ManualDataStep(state: OnboardingUiState, vm: OnboardingViewModel) {
@@ -328,20 +429,48 @@ private fun ManualDataStep(state: OnboardingUiState, vm: OnboardingViewModel) {
         title = stringResource(R.string.onboarding_manual_title),
         subtitle = stringResource(R.string.onboarding_manual_subtitle),
     )
-    if (state.allWearableCovered) {
+    if (!state.needsSleepInput && !state.needsStepsInput) {
         ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-            Text(
-                text = stringResource(R.string.onboarding_manual_all_covered),
-                style = MaterialTheme.typography.bodyLarge,
+            Column(
                 modifier = Modifier.padding(20.dp),
-            )
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.onboarding_manual_all_covered),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                state.representativeSleepHours?.let {
+                    ReviewRow(
+                        label = stringResource(R.string.onboarding_metric_sleep),
+                        value = stringResource(
+                            R.string.onboarding_sleep_value,
+                            it,
+                            stringResource(R.string.unit_hours_night),
+                        ),
+                    )
+                }
+                state.representativeDailySteps?.let {
+                    ReviewRow(
+                        label = stringResource(R.string.onboarding_metric_steps),
+                        value = stringResource(
+                            R.string.onboarding_steps_value,
+                            it,
+                            stringResource(R.string.unit_steps_day),
+                        ),
+                    )
+                }
+            }
         }
     } else {
         if (state.needsSleepInput) {
             SliderField(
                 label = stringResource(R.string.onboarding_sleep_label),
                 value = state.sleepHours,
-                valueText = "%.1f %s".format(state.sleepHours, stringResource(R.string.unit_hours_night)),
+                valueText = stringResource(
+                    R.string.onboarding_sleep_value,
+                    state.sleepHours,
+                    stringResource(R.string.unit_hours_night),
+                ),
                 range = 4f..12f,
                 steps = 15,
                 onValueChange = vm::setSleepHours,
@@ -351,28 +480,38 @@ private fun ManualDataStep(state: OnboardingUiState, vm: OnboardingViewModel) {
             SliderField(
                 label = stringResource(R.string.onboarding_steps_label),
                 value = state.dailySteps.toFloat(),
-                valueText = "%,d %s".format(state.dailySteps, stringResource(R.string.unit_steps_day)),
+                valueText = stringResource(
+                    R.string.onboarding_steps_value,
+                    state.dailySteps,
+                    stringResource(R.string.unit_steps_day),
+                ),
                 range = 1000f..25000f,
                 steps = 47,
                 onValueChange = { vm.setDailySteps(it.roundToInt()) },
             )
         }
     }
+
     SliderField(
         label = stringResource(R.string.onboarding_stress_label),
         value = state.stressLevel.toFloat(),
-        valueText = "${state.stressLevel} ${stringResource(R.string.unit_out_of_ten)}",
+        valueText = stringResource(R.string.onboarding_stress_value, state.stressLevel),
         range = 1f..10f,
         steps = 8,
         onValueChange = { vm.setStressLevel(it.roundToInt()) },
         startLabel = stringResource(R.string.onboarding_stress_low),
         endLabel = stringResource(R.string.onboarding_stress_high),
     )
+    if (state.wearableStressLevel != null) {
+        Text(
+            text = stringResource(R.string.onboarding_stress_proxy_note, state.wearableStressLevel),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
     Spacer(Modifier.height(8.dp))
     StepNavButtons(onBack = vm::back, onNext = vm::advance)
 }
-
-// ─── Step: Habits ────────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -383,11 +522,11 @@ private fun HabitsStep(state: OnboardingUiState, vm: OnboardingViewModel) {
     )
     LabelledGroup(stringResource(R.string.onboarding_smoking_label)) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SmokingStatus.entries.forEach { s ->
+            SmokingStatus.entries.forEach { smokingStatus ->
                 FilterChip(
-                    selected = state.smokingStatus == s,
-                    onClick = { vm.setSmokingStatus(s) },
-                    label = { Text(s.label()) },
+                    selected = state.smokingStatus == smokingStatus,
+                    onClick = { vm.setSmokingStatus(smokingStatus) },
+                    label = { Text(smokingStatus.label()) },
                 )
             }
         }
@@ -395,18 +534,22 @@ private fun HabitsStep(state: OnboardingUiState, vm: OnboardingViewModel) {
     SliderField(
         label = stringResource(R.string.onboarding_alcohol_label),
         value = state.alcoholDrinksPerWeek.toFloat(),
-        valueText = "${state.alcoholDrinksPerWeek} ${stringResource(R.string.unit_drinks_week)}",
+        valueText = stringResource(
+            R.string.onboarding_alcohol_value,
+            state.alcoholDrinksPerWeek,
+            stringResource(R.string.unit_drinks_week),
+        ),
         range = 0f..21f,
         steps = 20,
         onValueChange = { vm.setAlcohol(it.roundToInt()) },
     )
     LabelledGroup(stringResource(R.string.onboarding_diet_label)) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            DietQuality.entries.forEach { d ->
+            DietQuality.entries.forEach { dietQuality ->
                 FilterChip(
-                    selected = state.dietQuality == d,
-                    onClick = { vm.setDietQuality(d) },
-                    label = { Text(d.label()) },
+                    selected = state.dietQuality == dietQuality,
+                    onClick = { vm.setDietQuality(dietQuality) },
+                    label = { Text(dietQuality.label()) },
                 )
             }
         }
@@ -414,8 +557,6 @@ private fun HabitsStep(state: OnboardingUiState, vm: OnboardingViewModel) {
     Spacer(Modifier.height(8.dp))
     StepNavButtons(onBack = vm::back, onNext = vm::advance)
 }
-
-// ─── Step: Review ────────────────────────────────────────────────────────────
 
 @Composable
 private fun ReviewStep(
@@ -432,57 +573,113 @@ private fun ReviewStep(
             modifier = Modifier.padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            ReviewRow(stringResource(R.string.review_name),
-                state.displayName.ifBlank { stringResource(R.string.review_not_set) })
-            ReviewRow(stringResource(R.string.review_age),
-                state.ageInput.let { if (it.isBlank()) "—" else "$it ${stringResource(R.string.unit_years)}" })
-            ReviewRow(stringResource(R.string.review_sex),
-                state.biologicalSex?.label() ?: "—")
-            ReviewRow(stringResource(R.string.review_height),
-                state.heightInput.let { if (it.isBlank()) "—" else "$it ${stringResource(R.string.unit_cm)}" })
-            ReviewRow(stringResource(R.string.review_weight),
-                state.weightInput.let { if (it.isBlank()) "—" else "$it ${stringResource(R.string.unit_kg)}" })
+            ReviewRow(
+                label = stringResource(R.string.review_name),
+                value = state.displayName.ifBlank { stringResource(R.string.review_not_set) },
+            )
+            ReviewRow(
+                label = stringResource(R.string.review_age),
+                value = state.ageInput.takeIf { it.isNotBlank() }
+                    ?.let { "$it ${stringResource(R.string.unit_years)}" }
+                    ?: stringResource(R.string.review_dash),
+            )
+            ReviewRow(
+                label = stringResource(R.string.review_sex),
+                value = state.biologicalSex?.label() ?: stringResource(R.string.review_dash),
+            )
+            ReviewRow(
+                label = stringResource(R.string.review_height),
+                value = state.heightInput.takeIf { it.isNotBlank() }
+                    ?.let { "$it ${stringResource(R.string.unit_cm)}" }
+                    ?: stringResource(R.string.review_dash),
+            )
+            ReviewRow(
+                label = stringResource(R.string.review_weight),
+                value = state.weightInput.takeIf { it.isNotBlank() }
+                    ?.let { "$it ${stringResource(R.string.unit_kg)}" }
+                    ?: stringResource(R.string.review_dash),
+            )
             if (state.needsSleepInput) {
-                ReviewRow(stringResource(R.string.review_sleep),
-                    "%.1f ${stringResource(R.string.unit_hours_night)}".format(state.sleepHours))
+                ReviewRow(
+                    label = stringResource(R.string.review_sleep),
+                    value = stringResource(
+                        R.string.onboarding_sleep_value,
+                        state.sleepHours,
+                        stringResource(R.string.unit_hours_night),
+                    ),
+                )
             }
             if (state.needsStepsInput) {
-                ReviewRow(stringResource(R.string.review_steps),
-                    "%,d ${stringResource(R.string.unit_steps_day)}".format(state.dailySteps))
+                ReviewRow(
+                    label = stringResource(R.string.review_steps),
+                    value = stringResource(
+                        R.string.onboarding_steps_value,
+                        state.dailySteps,
+                        stringResource(R.string.unit_steps_day),
+                    ),
+                )
             }
-            ReviewRow(stringResource(R.string.review_stress), "${state.stressLevel}/10")
-            ReviewRow(stringResource(R.string.review_smoking), state.smokingStatus.label())
-            ReviewRow(stringResource(R.string.review_alcohol),
-                "${state.alcoholDrinksPerWeek} ${stringResource(R.string.unit_drinks_week)}")
-            ReviewRow(stringResource(R.string.review_diet), state.dietQuality.label())
+            ReviewRow(
+                label = stringResource(R.string.review_stress),
+                value = stringResource(R.string.onboarding_stress_value, state.stressLevel),
+            )
+            ReviewRow(
+                label = stringResource(R.string.review_smoking),
+                value = state.smokingStatus.label(),
+            )
+            ReviewRow(
+                label = stringResource(R.string.review_alcohol),
+                value = stringResource(
+                    R.string.onboarding_alcohol_value,
+                    state.alcoholDrinksPerWeek,
+                    stringResource(R.string.unit_drinks_week),
+                ),
+            )
+            ReviewRow(
+                label = stringResource(R.string.review_diet),
+                value = state.dietQuality.label(),
+            )
         }
     }
     Spacer(Modifier.height(8.dp))
     Button(
         onClick = onSubmit,
         enabled = !state.isSubmitting,
-        modifier = Modifier.fillMaxWidth().height(56.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp),
         shape = MaterialTheme.shapes.extraLarge,
     ) {
         if (state.isSubmitting) {
-            CircularProgressIndicator(modifier = Modifier.height(20.dp).width(20.dp), strokeWidth = 2.dp)
+            CircularProgressIndicator(
+                modifier = Modifier
+                    .height(20.dp)
+                    .width(20.dp),
+                strokeWidth = 2.dp,
+            )
         } else {
             Text(stringResource(R.string.onboarding_review_cta))
         }
     }
     OutlinedButton(
         onClick = onBack,
-        modifier = Modifier.fillMaxWidth().height(48.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(48.dp),
         shape = MaterialTheme.shapes.extraLarge,
-    ) { Text(stringResource(R.string.action_back)) }
+    ) {
+        Text(stringResource(R.string.action_back))
+    }
 }
-
-// ─── Shared composables ───────────────────────────────────────────────────────
 
 @Composable
 private fun StepHeader(title: String, subtitle: String) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(text = title, style = MaterialTheme.typography.headlineSmall)
+        Text(
+            text = title,
+            style = MaterialTheme.typography.headlineSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
         Text(
             text = subtitle,
             style = MaterialTheme.typography.bodyMedium,
@@ -494,8 +691,11 @@ private fun StepHeader(title: String, subtitle: String) {
 @Composable
 private fun LabelledGroup(label: String, content: @Composable () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(label, style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         content()
     }
 }
@@ -512,19 +712,42 @@ private fun SliderField(
     endLabel: String? = null,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(label, style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(valueText, style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = valueText,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
         }
-        Slider(value = value, onValueChange = onValueChange, valueRange = range, steps = steps)
+        Slider(
+            value = value,
+            onValueChange = onValueChange,
+            valueRange = range,
+            steps = steps,
+        )
         if (startLabel != null && endLabel != null) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(startLabel, style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(endLabel, style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text = startLabel,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = endLabel,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }
@@ -532,45 +755,76 @@ private fun SliderField(
 
 @Composable
 private fun ReviewRow(label: String, value: String) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.End)
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.End,
+        )
     }
 }
 
 @Composable
 private fun StepNavButtons(onBack: () -> Unit, onNext: () -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        OutlinedButton(onClick = onBack, modifier = Modifier.weight(1f).height(56.dp),
-            shape = MaterialTheme.shapes.extraLarge) { Text(stringResource(R.string.action_back)) }
-        Button(onClick = onNext, modifier = Modifier.weight(1f).height(56.dp),
-            shape = MaterialTheme.shapes.extraLarge) { Text(stringResource(R.string.action_next)) }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        OutlinedButton(
+            onClick = onBack,
+            modifier = Modifier
+                .weight(1f)
+                .height(56.dp),
+            shape = MaterialTheme.shapes.extraLarge,
+        ) {
+            Text(stringResource(R.string.action_back))
+        }
+        Button(
+            onClick = onNext,
+            modifier = Modifier
+                .weight(1f)
+                .height(56.dp),
+            shape = MaterialTheme.shapes.extraLarge,
+        ) {
+            Text(stringResource(R.string.action_next))
+        }
     }
 }
 
-// ─── Enum label helpers ───────────────────────────────────────────────────────
+@Composable
+private fun BiologicalSex.label(): String = stringResource(
+    when (this) {
+        BiologicalSex.MALE -> R.string.sex_male
+        BiologicalSex.FEMALE -> R.string.sex_female
+        BiologicalSex.OTHER -> R.string.sex_other
+        BiologicalSex.PREFER_NOT_TO_SAY -> R.string.sex_prefer_not
+    },
+)
 
 @Composable
-private fun BiologicalSex.label(): String = stringResource(when (this) {
-    BiologicalSex.MALE -> R.string.sex_male
-    BiologicalSex.FEMALE -> R.string.sex_female
-    BiologicalSex.OTHER -> R.string.sex_other
-    BiologicalSex.PREFER_NOT_TO_SAY -> R.string.sex_prefer_not
-})
+private fun SmokingStatus.label(): String = stringResource(
+    when (this) {
+        SmokingStatus.NEVER -> R.string.smoking_never
+        SmokingStatus.FORMER -> R.string.smoking_former
+        SmokingStatus.OCCASIONAL -> R.string.smoking_occasional
+        SmokingStatus.REGULAR -> R.string.smoking_regular
+    },
+)
 
 @Composable
-private fun SmokingStatus.label(): String = stringResource(when (this) {
-    SmokingStatus.NEVER -> R.string.smoking_never
-    SmokingStatus.FORMER -> R.string.smoking_former
-    SmokingStatus.OCCASIONAL -> R.string.smoking_occasional
-    SmokingStatus.REGULAR -> R.string.smoking_regular
-})
-
-@Composable
-private fun DietQuality.label(): String = stringResource(when (this) {
-    DietQuality.POOR -> R.string.diet_poor
-    DietQuality.AVERAGE -> R.string.diet_average
-    DietQuality.GOOD -> R.string.diet_good
-    DietQuality.EXCELLENT -> R.string.diet_excellent
-})
+private fun DietQuality.label(): String = stringResource(
+    when (this) {
+        DietQuality.POOR -> R.string.diet_poor
+        DietQuality.AVERAGE -> R.string.diet_average
+        DietQuality.GOOD -> R.string.diet_good
+        DietQuality.EXCELLENT -> R.string.diet_excellent
+    },
+)

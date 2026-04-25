@@ -6,6 +6,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.mzwprojects.mytwin.ui.screens.ChatScreen
+import com.mzwprojects.mytwin.ui.screens.FoodScanScreen
 import com.mzwprojects.mytwin.ui.screens.HomeScreen
 import com.mzwprojects.mytwin.ui.screens.OnboardingScreen
 import com.mzwprojects.mytwin.ui.screens.WelcomeScreen
@@ -15,6 +16,7 @@ object Routes {
     const val ONBOARDING = "onboarding"
     const val HOME = "home"
     const val CHAT = "chat"
+    const val FOOD_SCAN = "food_scan"
 }
 
 @Composable
@@ -49,11 +51,18 @@ fun AppNavGraph(
         composable(Routes.HOME) {
             HomeScreen(
                 onChatClicked = { navController.navigate(Routes.CHAT) },
+                onFoodScanClicked = { navController.navigate(Routes.FOOD_SCAN) },
             )
         }
 
         composable(Routes.CHAT) {
             ChatScreen(
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(Routes.FOOD_SCAN) {
+            FoodScanScreen(
                 onBack = { navController.popBackStack() },
             )
         }
