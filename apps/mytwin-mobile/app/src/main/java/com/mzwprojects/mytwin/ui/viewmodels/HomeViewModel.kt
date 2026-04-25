@@ -232,25 +232,26 @@ class HomeViewModel(
         val wearableStress = healthRepository.latestStressLevel()
         val signals = healthRepository.signalsByMetric()
 
-        _uiState.update {
-            val displayedSleep = profile.currentSleepHoursOverride ?: latestSleep ?: profile.averageSleepHours
-            val displayedSteps = profile.currentStepsOverride ?: latestSteps ?: profile.averageDailySteps
-            val displayedHeartRate = profile.currentHeartRateOverride ?: wearableHeartRate
-            val displayedStress = profile.currentStressLevelOverride ?: wearableStress ?: profile.perceivedStressLevel
+        _uiState.update { current ->
+            val resolvedProfile = mergeDisplayName(current.profile, profile)
+            val displayedSleep = resolvedProfile.currentSleepHoursOverride ?: latestSleep ?: resolvedProfile.averageSleepHours
+            val displayedSteps = resolvedProfile.currentStepsOverride ?: latestSteps ?: resolvedProfile.averageDailySteps
+            val displayedHeartRate = resolvedProfile.currentHeartRateOverride ?: wearableHeartRate
+            val displayedStress = resolvedProfile.currentStressLevelOverride ?: wearableStress ?: resolvedProfile.perceivedStressLevel
             HomeUiState(
-                profile = profile,
+                profile = resolvedProfile,
                 selectedDate = LocalDate.now(),
                 sleepHours = displayedSleep,
-                sleepIsFromWearable = profile.currentSleepHoursOverride == null && latestSleep != null,
-                sleepIsManualOverride = profile.currentSleepHoursOverride != null,
+                sleepIsFromWearable = resolvedProfile.currentSleepHoursOverride == null && latestSleep != null,
+                sleepIsManualOverride = resolvedProfile.currentSleepHoursOverride != null,
                 stepsToday = displayedSteps,
-                stepsIsFromWearable = profile.currentStepsOverride == null && latestSteps != null,
-                stepsIsManualOverride = profile.currentStepsOverride != null,
+                stepsIsFromWearable = resolvedProfile.currentStepsOverride == null && latestSteps != null,
+                stepsIsManualOverride = resolvedProfile.currentStepsOverride != null,
                 restingHR = displayedHeartRate,
-                heartRateIsManualOverride = profile.currentHeartRateOverride != null,
+                heartRateIsManualOverride = resolvedProfile.currentHeartRateOverride != null,
                 stressLevel = displayedStress,
-                stressIsFromWearable = profile.currentStressLevelOverride == null && wearableStress != null,
-                stressIsManualOverride = profile.currentStressLevelOverride != null,
+                stressIsFromWearable = resolvedProfile.currentStressLevelOverride == null && wearableStress != null,
+                stressIsManualOverride = resolvedProfile.currentStressLevelOverride != null,
                 showWearableNudge = signals.values.any {
                     it == WearableSignal.DEVICE_PRESENT_NOT_WORN_RECENTLY
                 },
@@ -288,9 +289,10 @@ class HomeViewModel(
             ?.average()
             ?.roundToInt()
 
-        _uiState.update {
+        _uiState.update { current ->
+            val resolvedProfile = mergeDisplayName(current.profile, profile)
             HomeUiState(
-                profile = profile,
+                profile = resolvedProfile,
                 selectedDate = selectedDate,
                 sleepHours = historicalSleep,
                 sleepIsFromWearable = historicalSleep != null,
@@ -339,6 +341,17 @@ class HomeViewModel(
                 stressIsManualOverride = profile.currentStressLevelOverride != null,
                 isLoading = false,
             )
+        }
+    }
+
+    private fun mergeDisplayName(currentProfile: UserProfile, incomingProfile: UserProfile): UserProfile {
+        return if (
+            incomingProfile.displayName.isNullOrBlank() &&
+            !currentProfile.displayName.isNullOrBlank()
+        ) {
+            incomingProfile.copy(displayName = currentProfile.displayName)
+        } else {
+            incomingProfile
         }
     }
 
