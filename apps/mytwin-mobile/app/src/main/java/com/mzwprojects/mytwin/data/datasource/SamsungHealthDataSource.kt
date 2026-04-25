@@ -3,6 +3,7 @@ package com.mzwprojects.mytwin.data.datasource
 import android.app.Activity
 import android.content.Context
 import android.util.Log
+import com.mzwprojects.mytwin.data.model.WearableSignal
 import com.samsung.android.sdk.health.data.HealthDataService
 import com.samsung.android.sdk.health.data.HealthDataStore
 import com.samsung.android.sdk.health.data.error.AuthorizationException
@@ -36,11 +37,13 @@ class SamsungHealthDataSource(context: Context) {
         HealthDataService.getStore(appContext)
     }
 
-    private val readPermissions: Set<Permission> = setOf(
-        Permission.of(DataTypes.STEPS, AccessType.READ),
-        Permission.of(DataTypes.SLEEP, AccessType.READ),
-        Permission.of(DataTypes.HEART_RATE, AccessType.READ),
+    private val metricPermissions: Map<SamsungHealthMetric, Permission> = mapOf(
+        SamsungHealthMetric.SLEEP to Permission.of(DataTypes.SLEEP, AccessType.READ),
+        SamsungHealthMetric.STEPS to Permission.of(DataTypes.STEPS, AccessType.READ),
+        SamsungHealthMetric.HEART_RATE to Permission.of(DataTypes.HEART_RATE, AccessType.READ),
     )
+
+    private val readPermissions: Set<Permission> = metricPermissions.values.toSet()
 
     val isConnected: Boolean
         get() = runCatching {
@@ -52,17 +55,23 @@ class SamsungHealthDataSource(context: Context) {
 
     fun connect(): Boolean = isConnected
 
-    suspend fun areAllPermissionsGranted(activity: Activity? = null): Boolean {
+    suspend fun grantedMetrics(activity: Activity? = null): Set<SamsungHealthMetric> {
         return try {
-            store.getGrantedPermissions(readPermissions)
-                .containsAll(readPermissions)
+            val grantedPermissions = store.getGrantedPermissions(readPermissions)
+            metricPermissions
+                .filterValues { it in grantedPermissions }
+                .keys
         } catch (error: HealthDataException) {
             handleHealthDataException("Permission check failed", error, activity)
-            false
+            emptySet()
         } catch (error: Throwable) {
             Log.w(TAG, "Permission check failed", error)
-            false
+            emptySet()
         }
+    }
+
+    suspend fun areAllPermissionsGranted(activity: Activity? = null): Boolean {
+        return grantedMetrics(activity).containsAll(SamsungHealthMetric.entries)
     }
 
     suspend fun requestPermissions(activity: Activity): Boolean {
@@ -184,6 +193,104 @@ class SamsungHealthDataSource(context: Context) {
         }
     }
 
+    suspend fun signalsByMetric(): Map<SamsungHealthMetric, WearableSignal> =
+        SamsungHealthMetric.entries.associateWith { signalByMetric(it) }
+
+    suspend fun signalByMetric(metric: SamsungHealthMetric): WearableSignal {
+        if (!isConnected) return WearableSignal.UNKNOWN
+        if (metric !in grantedMetrics()) return WearableSignal.UNKNOWN
+
+        val now = LocalDateTime.now()
+        if (hasData(metric, now.minusDays(3), now)) {
+            return WearableSignal.ACTIVE
+        }
+
+        return if (hasData(metric, now.minusDays(365), now.minusDays(3))) {
+            WearableSignal.DEVICE_PRESENT_NOT_WORN_RECENTLY
+        } else {
+            WearableSignal.NO_DEVICE_LIKELY
+        }
+    }
+
+    private suspend fun hasData(
+        metric: SamsungHealthMetric,
+        start: LocalDateTime,
+        end: LocalDateTime,
+    ): Boolean {
+        return when (metric) {
+            SamsungHealthMetric.SLEEP -> hasSleepData(start, end)
+            SamsungHealthMetric.STEPS -> hasStepsData(start, end)
+            SamsungHealthMetric.HEART_RATE -> hasHeartRateData(start, end)
+        }
+    }
+
+    private suspend fun hasSleepData(
+        start: LocalDateTime,
+        end: LocalDateTime,
+    ): Boolean {
+        return try {
+            val request = DataTypes.SLEEP.readDataRequestBuilder
+                .setLocalTimeFilter(LocalTimeFilter.of(start, end))
+                .setOrdering(Ordering.DESC)
+                .setLimit(1)
+                .build()
+
+            store.readData(request).dataList.isNotEmpty()
+        } catch (error: HealthDataException) {
+            handleHealthDataException("hasSleepData failed", error)
+            false
+        } catch (error: Throwable) {
+            Log.w(TAG, "hasSleepData failed", error)
+            false
+        }
+    }
+
+    private suspend fun hasStepsData(
+        start: LocalDateTime,
+        end: LocalDateTime,
+    ): Boolean {
+        return try {
+            val request = DataType.StepsType.TOTAL.requestBuilder
+                .setLocalTimeFilterWithGroup(
+                    LocalTimeFilter.of(start, end),
+                    LocalTimeGroup.of(LocalTimeGroupUnit.DAILY, 1),
+                )
+                .setOrdering(Ordering.ASC)
+                .build()
+
+            store.aggregateData(request).dataList.any { aggregatedData ->
+                (aggregatedData.value ?: 0L) > 0L
+            }
+        } catch (error: HealthDataException) {
+            handleHealthDataException("hasStepsData failed", error)
+            false
+        } catch (error: Throwable) {
+            Log.w(TAG, "hasStepsData failed", error)
+            false
+        }
+    }
+
+    private suspend fun hasHeartRateData(
+        start: LocalDateTime,
+        end: LocalDateTime,
+    ): Boolean {
+        return try {
+            val request = DataTypes.HEART_RATE.readDataRequestBuilder
+                .setLocalTimeFilter(LocalTimeFilter.of(start, end))
+                .setOrdering(Ordering.DESC)
+                .setLimit(1)
+                .build()
+
+            store.readData(request).dataList.isNotEmpty()
+        } catch (error: HealthDataException) {
+            handleHealthDataException("hasHeartRateData failed", error)
+            false
+        } catch (error: Throwable) {
+            Log.w(TAG, "hasHeartRateData failed", error)
+            false
+        }
+    }
+
     private fun handleHealthDataException(
         message: String,
         error: HealthDataException,
@@ -219,4 +326,10 @@ class SamsungHealthDataSource(context: Context) {
     companion object {
         private const val TAG = "SamsungHealth"
     }
+}
+
+enum class SamsungHealthMetric {
+    SLEEP,
+    STEPS,
+    HEART_RATE,
 }

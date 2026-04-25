@@ -9,7 +9,7 @@ import kotlinx.serialization.Serializable
  * conflate `null` with `0`. Concrete defaults live in the UI layer.
  *
  * Manual entries (e.g. [averageSleepHours]) are only used when the corresponding
- * Health Connect metric is *not* [WearableSignal.ACTIVE].
+ * Samsung Health metric is *not* [WearableSignal.ACTIVE].
  */
 @Serializable
 data class UserProfile(

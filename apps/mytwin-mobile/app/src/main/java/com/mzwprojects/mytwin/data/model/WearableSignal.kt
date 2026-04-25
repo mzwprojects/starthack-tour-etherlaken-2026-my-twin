@@ -2,7 +2,7 @@ package com.mzwprojects.mytwin.data.model
 
 /**
  * Represents how confident we are that the user owns a wearable that streams
- * data into Health Connect for a given metric.
+ * data into Samsung Health for a given metric.
  *
  * Note that "no data" alone is *not* enough to conclude "no wearable". The user
  * may simply not have worn the watch recently. We therefore combine:
@@ -14,7 +14,7 @@ package com.mzwprojects.mytwin.data.model
  *    show a "wear your watch" nudge.
  */
 enum class WearableSignal {
-    /** Permission denied or Health Connect unavailable — we genuinely don't know. */
+    /** Permission denied or Samsung Health unavailable — we genuinely don't know. */
     UNKNOWN,
 
     /** Permission granted but never any data → user likely lacks a wearable. */

@@ -1,18 +1,16 @@
 package com.mzwprojects.mytwin.data.repository
 
 import android.app.Activity
-import com.mzwprojects.mytwin.data.datasource.HealthConnectDataSource
-import com.mzwprojects.mytwin.data.datasource.HealthMetric
 import com.mzwprojects.mytwin.data.datasource.SamsungHealthDataSource
+import com.mzwprojects.mytwin.data.datasource.SamsungHealthMetric
 import com.mzwprojects.mytwin.data.model.WearableSignal
 
 /**
- * Read-only facade over Samsung Health (primary) + Health Connect (fallback).
+ * Read-only facade over Samsung Health.
  * ViewModels never touch the data sources directly.
  */
 class HealthRepository(
     private val samsungDataSource: SamsungHealthDataSource,
-    private val hcDataSource: HealthConnectDataSource,
 ) {
 
     // ─── Availability ────────────────────────────────────────────────────
@@ -27,24 +25,19 @@ class HealthRepository(
 
     suspend fun requestPermissions(activity: Activity) = samsungDataSource.requestPermissions(activity)
 
-    // ─── Health Connect fallback (kept for non-Samsung devices) ──────────
+    suspend fun grantedMetrics(): Set<SamsungHealthMetric> = samsungDataSource.grantedMetrics()
 
-    val isHcAvailable: Boolean get() = hcDataSource.isAvailable
-    val isHcNeedsUpdate: Boolean get() = hcDataSource.needsProviderUpdate
+    suspend fun signalsByMetric(): Map<SamsungHealthMetric, WearableSignal> =
+        samsungDataSource.signalsByMetric()
 
-    suspend fun grantedHcPermissions(): Set<String> = hcDataSource.grantedPermissions()
-
-    suspend fun signalsByMetric(): Map<HealthMetric, WearableSignal> =
-        HealthMetric.entries.associateWith { hcDataSource.classifySignal(it) }
-
-    // ─── Data — Samsung Health first, HC fallback ────────────────────────
+    // ─── Data ────────────────────────────────────────────────────────────
 
     suspend fun lastNightSleepHours(): Float? =
-        samsungDataSource.lastNightSleepHours() ?: hcDataSource.lastNightSleepHours()
+        samsungDataSource.lastNightSleepHours()
 
     suspend fun stepsToday(): Int? =
-        samsungDataSource.stepsToday() ?: hcDataSource.stepsToday()
+        samsungDataSource.stepsToday()
 
     suspend fun latestRestingHeartRate(): Int? =
-        samsungDataSource.latestHeartRate() ?: hcDataSource.latestRestingHeartRate()
+        samsungDataSource.latestHeartRate()
 }

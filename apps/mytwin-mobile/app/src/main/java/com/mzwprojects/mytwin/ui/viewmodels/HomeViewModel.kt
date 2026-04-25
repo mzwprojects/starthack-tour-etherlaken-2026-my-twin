@@ -25,14 +25,18 @@ data class HomeUiState(
     val showWearableNudge: Boolean = false,
     val isLoading: Boolean = true,
 ) {
-    val greetingKey: GreetingTime get() {
-        val hour = LocalTime.now().hour
-        return when {
-            hour < 12 -> GreetingTime.MORNING
-            hour < 18 -> GreetingTime.AFTERNOON
+    val greetingKey: GreetingTime
+        get() = when (LocalTime.now().hour) {
+            in 0..11 -> GreetingTime.MORNING
+            in 12..17 -> GreetingTime.AFTERNOON
             else -> GreetingTime.EVENING
         }
-    }
+
+    val canEditSleepManually: Boolean
+        get() = !sleepIsFromWearable
+
+    val canEditStepsManually: Boolean
+        get() = !stepsIsFromWearable
 }
 
 enum class GreetingTime { MORNING, AFTERNOON, EVENING }
@@ -49,29 +53,49 @@ class HomeViewModel(
         viewModelScope.launch {
             healthRepository.connectSamsung()
             userProfileRepository.profile.collect { profile ->
-                val hcSleep = healthRepository.lastNightSleepHours()
-                val hcSteps = healthRepository.stepsToday()
-                val hcHR = healthRepository.latestRestingHeartRate()
-                val signals = healthRepository.signalsByMetric()
-
-                val showNudge = signals.values.any {
-                    it == WearableSignal.DEVICE_PRESENT_NOT_WORN_RECENTLY
-                }
-
-                _uiState.update {
-                    HomeUiState(
-                        profile = profile,
-                        sleepHours = hcSleep ?: profile.averageSleepHours,
-                        sleepIsFromWearable = hcSleep != null,
-                        stepsToday = hcSteps ?: profile.averageDailySteps,
-                        stepsIsFromWearable = hcSteps != null,
-                        restingHR = hcHR,
-                        stressLevel = profile.perceivedStressLevel,
-                        showWearableNudge = showNudge,
-                        isLoading = false,
-                    )
-                }
+                refreshSnapshot(profile)
             }
+        }
+    }
+
+    fun updateManualSleep(hours: Float) {
+        viewModelScope.launch {
+            userProfileRepository.update { it.copy(averageSleepHours = hours) }
+        }
+    }
+
+    fun updateManualSteps(steps: Int) {
+        viewModelScope.launch {
+            userProfileRepository.update { it.copy(averageDailySteps = steps) }
+        }
+    }
+
+    fun updateManualStress(level: Int) {
+        viewModelScope.launch {
+            userProfileRepository.update { it.copy(perceivedStressLevel = level) }
+        }
+    }
+
+    private suspend fun refreshSnapshot(profile: UserProfile) {
+        val wearableSleep = healthRepository.lastNightSleepHours()
+        val wearableSteps = healthRepository.stepsToday()
+        val wearableHeartRate = healthRepository.latestRestingHeartRate()
+        val signals = healthRepository.signalsByMetric()
+
+        _uiState.update {
+            HomeUiState(
+                profile = profile,
+                sleepHours = wearableSleep ?: profile.averageSleepHours,
+                sleepIsFromWearable = wearableSleep != null,
+                stepsToday = wearableSteps ?: profile.averageDailySteps,
+                stepsIsFromWearable = wearableSteps != null,
+                restingHR = wearableHeartRate,
+                stressLevel = profile.perceivedStressLevel,
+                showWearableNudge = signals.values.any {
+                    it == WearableSignal.DEVICE_PRESENT_NOT_WORN_RECENTLY
+                },
+                isLoading = false,
+            )
         }
     }
 }

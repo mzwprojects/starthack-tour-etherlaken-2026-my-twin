@@ -1,7 +1,6 @@
 package com.mzwprojects.mytwin.di
 
 import android.content.Context
-import com.mzwprojects.mytwin.data.datasource.HealthConnectDataSource
 import com.mzwprojects.mytwin.data.datasource.OnboardingDataSource
 import com.mzwprojects.mytwin.data.datasource.SamsungHealthDataSource
 import com.mzwprojects.mytwin.data.datasource.UserProfileDataSource
@@ -34,10 +33,6 @@ object ServiceLocator {
         UserProfileDataSource(requireContext())
     }
 
-    val healthConnectDataSource: HealthConnectDataSource by lazy {
-        HealthConnectDataSource(requireContext())
-    }
-
     val samsungHealthDataSource: SamsungHealthDataSource by lazy {
         SamsungHealthDataSource(requireContext())
     }
@@ -52,6 +47,6 @@ object ServiceLocator {
     }
 
     val healthRepository: HealthRepository by lazy {
-        HealthRepository(samsungHealthDataSource, healthConnectDataSource)
+        HealthRepository(samsungHealthDataSource)
     }
 }
