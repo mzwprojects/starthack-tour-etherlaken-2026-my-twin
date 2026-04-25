@@ -72,6 +72,7 @@ private enum class ManualMetricEditor {
 @Composable
 fun HomeScreen(
     onChatClicked: () -> Unit,
+    onFoodScanClicked: () -> Unit,
     vm: HomeViewModel = viewModel(),
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
@@ -256,7 +257,7 @@ fun HomeScreen(
             Spacer(Modifier.height(16.dp))
 
             Button(
-                onClick = { },
+                onClick = onFoodScanClicked,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(60.dp),

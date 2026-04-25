@@ -147,4 +147,8 @@
     <string name="chat_coming_soon_eyebrow">YOUR DIGITAL TWIN</string>
     <string name="chat_coming_soon_title">Chat is coming soon.</string>
     <string name="chat_coming_soon_body">Real-time conversation with your AI health twin is on its way. Your profile is already being built in the background.</string>
+    <string name="food_scan_back">Back</string>
+    <string name="food_scan_coming_soon_eyebrow">YOUR FOOD SCANNER</string>
+    <string name="food_scan_coming_soon_title">Food scanning is coming soon.</string>
+    <string name="food_scan_coming_soon_body">Camera-based nutrition capture is on its way. Soon your twin will be able to factor meals into the bigger health picture.</string>
 </resources>
