@@ -65,6 +65,7 @@ import kotlin.math.roundToInt
 private enum class ManualMetricEditor {
     SLEEP,
     STEPS,
+    HEART_RATE,
     STRESS,
 }
 
@@ -75,6 +76,7 @@ fun HomeScreen(
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
     val primary = MaterialTheme.colorScheme.primary
+    val bpmUnit = stringResource(R.string.unit_bpm)
     var activeEditor by remember { mutableStateOf<ManualMetricEditor?>(null) }
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -174,49 +176,63 @@ fun HomeScreen(
             )
             Spacer(Modifier.height(12.dp))
 
-            if (state.canEditSleepManually) {
-                ManualTrackingCard(
-                    label = stringResource(R.string.home_sleep_label),
-                    value = state.sleepHours?.let {
-                        stringResource(R.string.home_sleep_value, it)
-                    } ?: stringResource(R.string.home_value_unavailable),
-                    description = if (state.sleepIsFromWearable) {
-                        stringResource(R.string.home_manual_sleep_description_context)
-                    } else {
-                        stringResource(R.string.home_manual_sleep_description)
-                    },
-                    onEdit = { activeEditor = ManualMetricEditor.SLEEP },
-                )
-                Spacer(Modifier.height(12.dp))
-            }
+            ManualTrackingCard(
+                label = stringResource(R.string.home_sleep_label),
+                value = state.sleepHours?.let {
+                    stringResource(R.string.home_sleep_value, it)
+                } ?: stringResource(R.string.home_value_unavailable),
+                description = if (state.sleepIsManualOverride) {
+                    stringResource(R.string.home_manual_override_active)
+                } else {
+                    stringResource(R.string.home_manual_sleep_description)
+                },
+                onEdit = { activeEditor = ManualMetricEditor.SLEEP },
+                onClear = if (state.hasSleepOverride) vm::clearManualSleepOverride else null,
+            )
+            Spacer(Modifier.height(12.dp))
 
-            if (state.canEditStepsManually) {
-                ManualTrackingCard(
-                    label = stringResource(R.string.home_steps_label),
-                    value = state.stepsToday?.let {
-                        stringResource(R.string.home_steps_value, it)
-                    } ?: stringResource(R.string.home_value_unavailable),
-                    description = if (state.stepsIsFromWearable) {
-                        stringResource(R.string.home_manual_steps_description_context)
-                    } else {
-                        stringResource(R.string.home_manual_steps_description)
-                    },
-                    onEdit = { activeEditor = ManualMetricEditor.STEPS },
-                )
-                Spacer(Modifier.height(12.dp))
-            }
+            ManualTrackingCard(
+                label = stringResource(R.string.home_steps_label),
+                value = state.stepsToday?.let {
+                    stringResource(R.string.home_steps_value, it)
+                } ?: stringResource(R.string.home_value_unavailable),
+                description = if (state.stepsIsManualOverride) {
+                    stringResource(R.string.home_manual_override_active)
+                } else {
+                    stringResource(R.string.home_manual_steps_description)
+                },
+                onEdit = { activeEditor = ManualMetricEditor.STEPS },
+                onClear = if (state.hasStepsOverride) vm::clearManualStepsOverride else null,
+            )
+            Spacer(Modifier.height(12.dp))
+
+            ManualTrackingCard(
+                label = stringResource(R.string.home_heartrate_label),
+                value = state.restingHR?.let {
+                    "$it ${stringResource(R.string.unit_bpm)}"
+                } ?: stringResource(R.string.home_value_unavailable),
+                description = if (state.heartRateIsManualOverride) {
+                    stringResource(R.string.home_manual_override_active)
+                } else {
+                    stringResource(R.string.home_manual_heartrate_description)
+                },
+                onEdit = { activeEditor = ManualMetricEditor.HEART_RATE },
+                onClear = if (state.hasHeartRateOverride) vm::clearManualHeartRateOverride else null,
+            )
+            Spacer(Modifier.height(12.dp))
 
             ManualTrackingCard(
                 label = stringResource(R.string.home_stress_label),
                 value = state.stressLevel?.let {
                     stringResource(R.string.home_stress_value, it)
                 } ?: stringResource(R.string.home_value_unavailable),
-                description = if (state.stressIsFromWearable) {
-                    stringResource(R.string.home_manual_stress_description_context)
+                description = if (state.stressIsManualOverride) {
+                    stringResource(R.string.home_manual_override_active)
                 } else {
                     stringResource(R.string.home_manual_stress_description)
                 },
                 onEdit = { activeEditor = ManualMetricEditor.STRESS },
+                onClear = if (state.hasStressOverride) vm::clearManualStressOverride else null,
             )
 
             Spacer(Modifier.height(32.dp))
@@ -287,6 +303,14 @@ fun HomeScreen(
                 vm.updateManualSleep(it)
                 activeEditor = null
             },
+            onClear = if (state.hasSleepOverride) {
+                {
+                    vm.clearManualSleepOverride()
+                    activeEditor = null
+                }
+            } else {
+                null
+            },
         )
 
         ManualMetricEditor.STEPS -> ManualValueDialog(
@@ -300,6 +324,35 @@ fun HomeScreen(
                 vm.updateManualSteps(it.roundToInt())
                 activeEditor = null
             },
+            onClear = if (state.hasStepsOverride) {
+                {
+                    vm.clearManualStepsOverride()
+                    activeEditor = null
+                }
+            } else {
+                null
+            },
+        )
+
+        ManualMetricEditor.HEART_RATE -> ManualValueDialog(
+            title = stringResource(R.string.home_manual_heartrate_dialog_title),
+            initialValue = (state.restingHR ?: 80).toFloat(),
+            range = 40f..200f,
+            steps = 159,
+            valueFormatter = { "${it.roundToInt()} $bpmUnit" },
+            onDismiss = { activeEditor = null },
+            onSave = {
+                vm.updateManualHeartRate(it.roundToInt())
+                activeEditor = null
+            },
+            onClear = if (state.hasHeartRateOverride) {
+                {
+                    vm.clearManualHeartRateOverride()
+                    activeEditor = null
+                }
+            } else {
+                null
+            },
         )
 
         ManualMetricEditor.STRESS -> ManualValueDialog(
@@ -312,6 +365,14 @@ fun HomeScreen(
             onSave = {
                 vm.updateManualStress(it.roundToInt())
                 activeEditor = null
+            },
+            onClear = if (state.hasStressOverride) {
+                {
+                    vm.clearManualStressOverride()
+                    activeEditor = null
+                }
+            } else {
+                null
             },
         )
 
@@ -330,7 +391,9 @@ private fun MetricGrid(state: HomeUiState) {
                 value = state.sleepHours?.let { stringResource(R.string.home_sleep_value, it) }
                     ?: stringResource(R.string.home_value_unavailable),
                 source = if (state.sleepHours != null) {
-                    if (state.sleepIsFromWearable) {
+                    if (state.sleepIsManualOverride) {
+                        stringResource(R.string.home_source_manual_override)
+                    } else if (state.sleepIsFromWearable) {
                         stringResource(R.string.home_source_wearable)
                     } else {
                         stringResource(R.string.home_source_manual)
@@ -346,7 +409,9 @@ private fun MetricGrid(state: HomeUiState) {
                 value = state.stepsToday?.let { stringResource(R.string.home_steps_value, it) }
                     ?: stringResource(R.string.home_value_unavailable),
                 source = if (state.stepsToday != null) {
-                    if (state.stepsIsFromWearable) {
+                    if (state.stepsIsManualOverride) {
+                        stringResource(R.string.home_source_manual_override)
+                    } else if (state.stepsIsFromWearable) {
                         stringResource(R.string.home_source_wearable)
                     } else {
                         stringResource(R.string.home_source_manual)
@@ -364,7 +429,11 @@ private fun MetricGrid(state: HomeUiState) {
                 value = state.restingHR?.let { "$it ${stringResource(R.string.unit_bpm)}" }
                     ?: stringResource(R.string.home_value_unavailable),
                 source = if (state.restingHR != null) {
-                    stringResource(R.string.home_source_wearable)
+                    if (state.heartRateIsManualOverride) {
+                        stringResource(R.string.home_source_manual_override)
+                    } else {
+                        stringResource(R.string.home_source_wearable)
+                    }
                 } else {
                     null
                 },
@@ -376,7 +445,9 @@ private fun MetricGrid(state: HomeUiState) {
                 value = state.stressLevel?.let { stringResource(R.string.home_stress_value, it) }
                     ?: stringResource(R.string.home_value_unavailable),
                 source = if (state.stressLevel != null) {
-                    if (state.stressIsFromWearable) {
+                    if (state.stressIsManualOverride) {
+                        stringResource(R.string.home_source_manual_override)
+                    } else if (state.stressIsFromWearable) {
                         stringResource(R.string.home_source_wearable)
                     } else {
                         stringResource(R.string.home_source_manual)
@@ -450,6 +521,7 @@ private fun ManualTrackingCard(
     value: String,
     description: String,
     onEdit: () -> Unit,
+    onClear: (() -> Unit)?,
 ) {
     OutlinedCard(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -477,14 +549,24 @@ private fun ManualTrackingCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            OutlinedButton(onClick = onEdit) {
-                Icon(
-                    imageVector = Icons.Rounded.Edit,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(Modifier.size(8.dp))
-                Text(text = stringResource(R.string.home_manual_update))
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedButton(onClick = onEdit) {
+                    Icon(
+                        imageVector = Icons.Rounded.Edit,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(Modifier.size(8.dp))
+                    Text(text = stringResource(R.string.home_manual_update))
+                }
+                if (onClear != null) {
+                    OutlinedButton(onClick = onClear) {
+                        Text(text = stringResource(R.string.home_manual_clear))
+                    }
+                }
             }
         }
     }
@@ -499,6 +581,7 @@ private fun ManualValueDialog(
     valueFormatter: (Float) -> String,
     onDismiss: () -> Unit,
     onSave: (Float) -> Unit,
+    onClear: (() -> Unit)? = null,
 ) {
     var value by remember(initialValue) { mutableFloatStateOf(initialValue) }
 
@@ -526,8 +609,15 @@ private fun ManualValueDialog(
             }
         },
         dismissButton = {
-            OutlinedButton(onClick = onDismiss) {
-                Text(text = stringResource(R.string.action_cancel))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (onClear != null) {
+                    OutlinedButton(onClick = onClear) {
+                        Text(text = stringResource(R.string.home_manual_clear))
+                    }
+                }
+                OutlinedButton(onClick = onDismiss) {
+                    Text(text = stringResource(R.string.action_cancel))
+                }
             }
         },
     )

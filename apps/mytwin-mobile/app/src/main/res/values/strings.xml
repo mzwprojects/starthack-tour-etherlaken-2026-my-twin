@@ -119,6 +119,7 @@
     <string name="home_stress_label">Stress</string>
     <string name="home_source_wearable">wearable</string>
     <string name="home_source_manual">manual</string>
+    <string name="home_source_manual_override">manual override</string>
     <string name="home_nudge_message">No recent Samsung Health data has synced in the last few days. Wearing the watch lately?</string>
     <string name="home_chat_cta">Chat with Your Twin</string>
     <string name="home_food_scan_label">Food Scanner</string>
@@ -128,17 +129,18 @@
     <string name="home_steps_value">%1$,d steps</string>
     <string name="home_stress_value">%1$d / 10</string>
     <string name="home_manual_tracking_title">Manual tracking</string>
-    <string name="home_manual_tracking_subtitle">Update the baseline values your twin uses whenever wearable data is unavailable.</string>
-    <string name="home_manual_update">Update</string>
-    <string name="home_manual_sleep_description">Used when fresh sleep data is not available from Samsung Health.</string>
-    <string name="home_manual_sleep_description_context">Wearable data stays primary. This manual value is only fallback context.</string>
-    <string name="home_manual_steps_description">Used when fresh step data is not available from Samsung Health.</string>
-    <string name="home_manual_steps_description_context">Wearable data stays primary. This manual value is only fallback context.</string>
-    <string name="home_manual_stress_description">This stays manual for now and helps shape the twin\'s baseline.</string>
-    <string name="home_manual_stress_description_context">Samsung Health stress currently comes from Energy Score as a proxy. This manual value is fallback context.</string>
-    <string name="home_manual_sleep_dialog_title">Update sleep baseline</string>
-    <string name="home_manual_steps_dialog_title">Update steps baseline</string>
-    <string name="home_manual_stress_dialog_title">Update stress baseline</string>
+    <string name="home_manual_tracking_subtitle">Correct the currently displayed values when the wearable data is missing, delayed, or just wrong.</string>
+    <string name="home_manual_update">Override</string>
+    <string name="home_manual_clear">Clear</string>
+    <string name="home_manual_override_active">A manual override is active for the value currently shown on Home.</string>
+    <string name="home_manual_sleep_description">Override the current sleep value if the wearable missed a nap, partial night, or was not worn.</string>
+    <string name="home_manual_steps_description">Override the current steps value if today\'s synced count is delayed or inaccurate.</string>
+    <string name="home_manual_heartrate_description">Override the current heart rate if the latest synced reading is stale or missing.</string>
+    <string name="home_manual_stress_description">Override the current stress value if the wearable-derived value does not reflect today.</string>
+    <string name="home_manual_sleep_dialog_title">Override current sleep</string>
+    <string name="home_manual_steps_dialog_title">Override current steps</string>
+    <string name="home_manual_heartrate_dialog_title">Override current heart rate</string>
+    <string name="home_manual_stress_dialog_title">Override current stress</string>
 
     <string name="chat_title">Your Digital Twin</string>
     <string name="chat_back">Back</string>
