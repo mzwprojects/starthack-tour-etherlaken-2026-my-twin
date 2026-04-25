@@ -5,6 +5,7 @@ import com.mzwprojects.mytwin.data.datasource.SamsungHealthDataSource
 import com.mzwprojects.mytwin.data.datasource.SamsungHealthMetric
 import com.mzwprojects.mytwin.data.datasource.SamsungPermissionRequestResult
 import com.mzwprojects.mytwin.data.datasource.SamsungPermissionStatus
+import com.mzwprojects.mytwin.data.model.WearableHistoryPoint
 import com.mzwprojects.mytwin.data.model.WearableSignal
 
 /**
@@ -54,4 +55,16 @@ class HealthRepository(
 
     suspend fun latestStressLevel(): Int? =
         samsungDataSource.latestStressLevel()
+
+    suspend fun sleepHistory(days: Long = 14): List<WearableHistoryPoint<Float>> =
+        samsungDataSource.sleepHistory(days)
+
+    suspend fun heartRateHistory(hours: Long = 24): List<WearableHistoryPoint<Float>> =
+        samsungDataSource.heartRateHistory(hours)
+
+    suspend fun dailyStepsHistory(days: Long = 14): List<WearableHistoryPoint<Int>> =
+        samsungDataSource.dailyStepsHistory(days)
+
+    suspend fun stressHistory(days: Long = 14): List<WearableHistoryPoint<Int>> =
+        samsungDataSource.stressHistory(days)
 }

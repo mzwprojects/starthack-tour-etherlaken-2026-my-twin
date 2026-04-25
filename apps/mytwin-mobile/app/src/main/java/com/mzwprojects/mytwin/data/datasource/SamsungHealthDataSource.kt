@@ -3,6 +3,7 @@ package com.mzwprojects.mytwin.data.datasource
 import android.app.Activity
 import android.content.Context
 import android.util.Log
+import com.mzwprojects.mytwin.data.model.WearableHistoryPoint
 import com.mzwprojects.mytwin.data.model.WearableSignal
 import com.samsung.android.sdk.health.data.HealthDataService
 import com.samsung.android.sdk.health.data.HealthDataStore
@@ -22,7 +23,9 @@ import com.samsung.android.sdk.health.data.request.LocalTimeGroup
 import com.samsung.android.sdk.health.data.request.LocalTimeGroupUnit
 import com.samsung.android.sdk.health.data.request.Ordering
 import com.samsung.android.sdk.health.data.request.ReadSourceFilter
+import java.time.Instant
 import java.time.LocalDateTime
+import java.time.ZoneId
 import kotlin.math.roundToInt
 
 /**
@@ -171,8 +174,9 @@ class SamsungHealthDataSource(context: Context) {
         return try {
             val now = LocalDateTime.now()
             val start = now.minusHours(36)
-            readSleepDurations(start, now)
-                .maxOrNull()
+            readSleepSamples(start, now)
+                .maxByOrNull { it.timestamp }
+                ?.value
         } catch (error: HealthDataException) {
             handleHealthDataException("lastNightSleepHours failed", error)
             null
@@ -187,10 +191,9 @@ class SamsungHealthDataSource(context: Context) {
 
         return try {
             val now = LocalDateTime.now()
-            val start = now.minusDays(7)
-            readHeartRateValues(start, now)
-                .firstOrNull()
-                ?.roundToInt()
+            readLatestHeartRateInWindow(now.minusMinutes(5), now)
+                ?: readLatestHeartRateInWindow(now.minusMinutes(30), now)
+                ?: readLatestHeartRateInWindow(now.minusHours(12), now)
         } catch (error: HealthDataException) {
             handleHealthDataException("latestHeartRate failed", error)
             null
@@ -205,7 +208,7 @@ class SamsungHealthDataSource(context: Context) {
 
         return try {
             val now = LocalDateTime.now()
-            val durations = readSleepDurations(now.minusDays(days), now)
+            val durations = readSleepSamples(now.minusDays(days), now).map { it.value }
 
             durations
                 .takeIf { it.isNotEmpty() }
@@ -252,6 +255,50 @@ class SamsungHealthDataSource(context: Context) {
         }
     }
 
+    suspend fun sleepHistory(days: Long = 14): List<WearableHistoryPoint<Float>> {
+        if (SamsungHealthMetric.SLEEP !in grantedMetrics()) return emptyList()
+        val now = LocalDateTime.now()
+        return readSleepSamples(now.minusDays(days), now)
+    }
+
+    suspend fun heartRateHistory(hours: Long = 24): List<WearableHistoryPoint<Float>> {
+        if (SamsungHealthMetric.HEART_RATE !in grantedMetrics()) return emptyList()
+        val now = LocalDateTime.now()
+        return readHeartRateSamples(now.minusHours(hours), now)
+    }
+
+    suspend fun dailyStepsHistory(days: Long = 14): List<WearableHistoryPoint<Int>> {
+        if (SamsungHealthMetric.STEPS !in grantedMetrics()) return emptyList()
+
+        return try {
+            val now = LocalDateTime.now()
+            val request = DataType.StepsType.TOTAL.requestBuilder
+                .setLocalTimeFilterWithGroup(
+                    LocalTimeFilter.of(now.minusDays(days), now),
+                    LocalTimeGroup.of(LocalTimeGroupUnit.DAILY, 1),
+                )
+                .setOrdering(Ordering.ASC)
+                .build()
+
+            store.aggregateData(request).dataList.mapNotNull { aggregatedData ->
+                val value = aggregatedData.value?.toInt() ?: return@mapNotNull null
+                val groupedStartTime = aggregatedData.startTime ?: return@mapNotNull null
+                WearableHistoryPoint(
+                    timestamp = groupedStartTime
+                        .atZone(ZoneId.systemDefault())
+                        .toInstant(),
+                    value = value,
+                )
+            }
+        } catch (error: HealthDataException) {
+            handleHealthDataException("dailyStepsHistory failed", error)
+            emptyList()
+        } catch (error: Throwable) {
+            Log.w(TAG, "dailyStepsHistory failed", error)
+            emptyList()
+        }
+    }
+
     suspend fun latestStressLevel(days: Long = 7): Int? {
         if (SamsungHealthMetric.STRESS !in grantedMetrics()) return null
 
@@ -279,6 +326,40 @@ class SamsungHealthDataSource(context: Context) {
         } catch (error: Throwable) {
             Log.w(TAG, "latestStressLevel failed", error)
             null
+        }
+    }
+
+    suspend fun stressHistory(days: Long = 14): List<WearableHistoryPoint<Int>> {
+        if (SamsungHealthMetric.STRESS !in grantedMetrics()) return emptyList()
+
+        return try {
+            val today = LocalDateTime.now().toLocalDate()
+            val request = DataTypes.ENERGY_SCORE.readDataRequestBuilder
+                .setLocalDateFilter(
+                    com.samsung.android.sdk.health.data.request.LocalDateFilter.of(
+                        today.minusDays(days),
+                        today,
+                    ),
+                )
+                .setOrdering(Ordering.DESC)
+                .build()
+
+            store.readData(request).dataList.mapNotNull { dataPoint ->
+                val energyScore = dataPoint.getValue(DataType.EnergyScoreType.ENERGY_SCORE)
+                    ?: return@mapNotNull null
+                WearableHistoryPoint(
+                    timestamp = dataPoint.endTime
+                        ?: dataPoint.startTime
+                        ?: Instant.now(),
+                    value = mapEnergyScoreToStressLevel(energyScore),
+                )
+            }
+        } catch (error: HealthDataException) {
+            handleHealthDataException("stressHistory failed", error)
+            emptyList()
+        } catch (error: Throwable) {
+            Log.w(TAG, "stressHistory failed", error)
+            emptyList()
         }
     }
 
@@ -319,7 +400,7 @@ class SamsungHealthDataSource(context: Context) {
         end: LocalDateTime,
     ): Boolean {
         return try {
-            readSleepDurations(start, end).isNotEmpty()
+            readSleepSamples(start, end).isNotEmpty()
         } catch (error: HealthDataException) {
             handleHealthDataException("hasSleepData failed", error)
             false
@@ -359,7 +440,7 @@ class SamsungHealthDataSource(context: Context) {
         end: LocalDateTime,
     ): Boolean {
         return try {
-            readHeartRateValues(start, end).isNotEmpty()
+            readHeartRateSamples(start, end).isNotEmpty()
         } catch (error: HealthDataException) {
             handleHealthDataException("hasHeartRateData failed", error)
             false
@@ -400,10 +481,25 @@ class SamsungHealthDataSource(context: Context) {
         return (10f - (clampedScore / 100f) * 9f).roundToInt().coerceIn(1, 10)
     }
 
+    private suspend fun readLatestHeartRateInWindow(
+        start: LocalDateTime,
+        end: LocalDateTime,
+    ): Int? {
+        return readHeartRateSamples(start, end)
+            .maxByOrNull { it.timestamp }
+            ?.value
+            ?.roundToInt()
+    }
+
     private suspend fun readSleepDurations(
         start: LocalDateTime,
         end: LocalDateTime,
-    ): List<Float> {
+    ): List<Float> = readSleepSamples(start, end).map { it.value }
+
+    private suspend fun readSleepSamples(
+        start: LocalDateTime,
+        end: LocalDateTime,
+    ): List<WearableHistoryPoint<Float>> {
         val filter = LocalTimeFilter.of(start, end)
         return readWithSourceFallbacks(
             label = "sleep",
@@ -416,13 +512,23 @@ class SamsungHealthDataSource(context: Context) {
                     .flatMap { dataPoint ->
                         buildList {
                             dataPoint.getValue(DataType.SleepType.DURATION)?.let { duration ->
-                                add(duration.toMinutes().toFloat() / 60f)
+                                add(
+                                    WearableHistoryPoint(
+                                        timestamp = dataPoint.endTime ?: Instant.now(),
+                                        value = duration.toMinutes().toFloat() / 60f,
+                                    ),
+                                )
                             }
                             dataPoint.getValue(DataType.SleepType.SESSIONS)
-                                ?.map { session -> session.duration.toMinutes().toFloat() / 60f }
+                                ?.map { session ->
+                                    WearableHistoryPoint(
+                                        timestamp = session.endTime ?: Instant.now(),
+                                        value = session.duration.toMinutes().toFloat() / 60f,
+                                    )
+                                }
                                 ?.let(::addAll)
                         }
-                    }
+                    }.sortedByDescending { it.timestamp }
             },
         )
     }
@@ -430,7 +536,12 @@ class SamsungHealthDataSource(context: Context) {
     private suspend fun readHeartRateValues(
         start: LocalDateTime,
         end: LocalDateTime,
-    ): List<Float> {
+    ): List<Float> = readHeartRateSamples(start, end).map { it.value }
+
+    private suspend fun readHeartRateSamples(
+        start: LocalDateTime,
+        end: LocalDateTime,
+    ): List<WearableHistoryPoint<Float>> {
         val filter = LocalTimeFilter.of(start, end)
         return readWithSourceFallbacks(
             label = "heart_rate",
@@ -442,14 +553,24 @@ class SamsungHealthDataSource(context: Context) {
                 store.readData(builder.build()).dataList
                     .flatMap { dataPoint ->
                         buildList {
-                            dataPoint.getValue(DataType.HeartRateType.HEART_RATE)?.let(::add)
+                            dataPoint.getValue(DataType.HeartRateType.HEART_RATE)?.let { heartRate ->
+                                add(
+                                    WearableHistoryPoint(
+                                        timestamp = dataPoint.endTime ?: Instant.now(),
+                                        value = heartRate,
+                                    ),
+                                )
+                            }
                             dataPoint.getValue(DataType.HeartRateType.SERIES_DATA)
-                                ?.map { seriesPoint -> seriesPoint.heartRate }
+                                ?.map { seriesPoint ->
+                                    WearableHistoryPoint(
+                                        timestamp = seriesPoint.endTime ?: Instant.now(),
+                                        value = seriesPoint.heartRate,
+                                    )
+                                }
                                 ?.let(::addAll)
-                            dataPoint.getValue(DataType.HeartRateType.MAX_HEART_RATE)?.let(::add)
-                            dataPoint.getValue(DataType.HeartRateType.MIN_HEART_RATE)?.let(::add)
                         }
-                    }
+                    }.sortedByDescending { it.timestamp }
             },
         )
     }
