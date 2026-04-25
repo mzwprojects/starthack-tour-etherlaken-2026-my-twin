@@ -112,7 +112,11 @@
     <string name="home_greeting_afternoon">Good afternoon</string>
     <string name="home_greeting_evening">Good evening</string>
     <string name="home_today_eyebrow">YOUR HEALTH TODAY</string>
+    <string name="home_history_eyebrow">YOUR HEALTH HISTORY</string>
     <string name="home_snapshot_title">Today\'s snapshot</string>
+    <string name="home_snapshot_title_for_day">%1$s snapshot</string>
+    <string name="home_date_today">Today</string>
+    <string name="home_date_yesterday">Yesterday</string>
     <string name="home_sleep_label">Sleep</string>
     <string name="home_steps_label">Steps</string>
     <string name="home_heartrate_label">Heart Rate</string>
@@ -137,6 +141,7 @@
     <string name="home_manual_steps_description">Override the current steps value if today\'s synced count is delayed or inaccurate.</string>
     <string name="home_manual_heartrate_description">Override the current heart rate if the latest synced reading is stale or missing.</string>
     <string name="home_manual_stress_description">Override the current stress value if the wearable-derived value does not reflect today.</string>
+    <string name="home_history_readonly_note">Historical days are read-only for now. Manual overrides only apply to today\'s live snapshot.</string>
     <string name="home_manual_sleep_dialog_title">Override current sleep</string>
     <string name="home_manual_steps_dialog_title">Override current steps</string>
     <string name="home_manual_heartrate_dialog_title">Override current heart rate</string>

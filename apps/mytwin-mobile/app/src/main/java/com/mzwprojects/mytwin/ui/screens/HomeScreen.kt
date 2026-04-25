@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -60,6 +61,9 @@ import com.mzwprojects.mytwin.R
 import com.mzwprojects.mytwin.ui.viewmodels.GreetingTime
 import com.mzwprojects.mytwin.ui.viewmodels.HomeUiState
 import com.mzwprojects.mytwin.ui.viewmodels.HomeViewModel
+import java.time.LocalDate
+import java.time.format.TextStyle
+import java.util.Locale
 import kotlin.math.roundToInt
 
 private enum class ManualMetricEditor {
@@ -113,7 +117,11 @@ fun HomeScreen(
             Spacer(Modifier.height(28.dp))
 
             Text(
-                text = stringResource(R.string.home_today_eyebrow),
+                text = if (state.isViewingToday) {
+                    stringResource(R.string.home_today_eyebrow)
+                } else {
+                    stringResource(R.string.home_history_eyebrow)
+                },
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.primary,
             )
@@ -133,14 +141,32 @@ fun HomeScreen(
             Spacer(Modifier.height(32.dp))
 
             Text(
-                text = stringResource(R.string.home_snapshot_title),
+                text = if (state.isViewingToday) {
+                    stringResource(R.string.home_snapshot_title)
+                } else {
+                    stringResource(
+                        R.string.home_snapshot_title_for_day,
+                        state.selectedDate.toDisplayLabel(
+                            todayLabel = stringResource(R.string.home_date_today),
+                            yesterdayLabel = stringResource(R.string.home_date_yesterday),
+                        ),
+                    )
+                },
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.primary,
             )
             Spacer(Modifier.height(12.dp))
+            DateSelectorRow(
+                selectedDate = state.selectedDate,
+                dates = state.recentDates,
+                onDateSelected = vm::selectDate,
+                todayLabel = stringResource(R.string.home_date_today),
+                yesterdayLabel = stringResource(R.string.home_date_yesterday),
+            )
+            Spacer(Modifier.height(12.dp))
             MetricGrid(state)
 
-            if (state.showWearableNudge) {
+            if (state.showWearableNudge && state.isViewingToday) {
                 Spacer(Modifier.height(16.dp))
                 OutlinedCard(modifier = Modifier.fillMaxWidth()) {
                     Row(
@@ -162,79 +188,91 @@ fun HomeScreen(
                 }
             }
 
-            Spacer(Modifier.height(24.dp))
+            if (state.isViewingToday) {
+                Spacer(Modifier.height(24.dp))
 
-            Text(
-                text = stringResource(R.string.home_manual_tracking_title),
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = stringResource(R.string.home_manual_tracking_subtitle),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(12.dp))
+                Text(
+                    text = stringResource(R.string.home_manual_tracking_title),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = stringResource(R.string.home_manual_tracking_subtitle),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(12.dp))
 
-            ManualTrackingCard(
-                label = stringResource(R.string.home_sleep_label),
-                value = state.sleepHours?.let {
-                    stringResource(R.string.home_sleep_value, it)
-                } ?: stringResource(R.string.home_value_unavailable),
-                description = if (state.sleepIsManualOverride) {
-                    stringResource(R.string.home_manual_override_active)
-                } else {
-                    stringResource(R.string.home_manual_sleep_description)
-                },
-                onEdit = { activeEditor = ManualMetricEditor.SLEEP },
-                onClear = if (state.hasSleepOverride) vm::clearManualSleepOverride else null,
-            )
-            Spacer(Modifier.height(12.dp))
+                ManualTrackingCard(
+                    label = stringResource(R.string.home_sleep_label),
+                    value = state.sleepHours?.let {
+                        stringResource(R.string.home_sleep_value, it)
+                    } ?: stringResource(R.string.home_value_unavailable),
+                    description = if (state.sleepIsManualOverride) {
+                        stringResource(R.string.home_manual_override_active)
+                    } else {
+                        stringResource(R.string.home_manual_sleep_description)
+                    },
+                    onEdit = { activeEditor = ManualMetricEditor.SLEEP },
+                    onClear = if (state.hasSleepOverride) vm::clearManualSleepOverride else null,
+                )
+                Spacer(Modifier.height(12.dp))
 
-            ManualTrackingCard(
-                label = stringResource(R.string.home_steps_label),
-                value = state.stepsToday?.let {
-                    stringResource(R.string.home_steps_value, it)
-                } ?: stringResource(R.string.home_value_unavailable),
-                description = if (state.stepsIsManualOverride) {
-                    stringResource(R.string.home_manual_override_active)
-                } else {
-                    stringResource(R.string.home_manual_steps_description)
-                },
-                onEdit = { activeEditor = ManualMetricEditor.STEPS },
-                onClear = if (state.hasStepsOverride) vm::clearManualStepsOverride else null,
-            )
-            Spacer(Modifier.height(12.dp))
+                ManualTrackingCard(
+                    label = stringResource(R.string.home_steps_label),
+                    value = state.stepsToday?.let {
+                        stringResource(R.string.home_steps_value, it)
+                    } ?: stringResource(R.string.home_value_unavailable),
+                    description = if (state.stepsIsManualOverride) {
+                        stringResource(R.string.home_manual_override_active)
+                    } else {
+                        stringResource(R.string.home_manual_steps_description)
+                    },
+                    onEdit = { activeEditor = ManualMetricEditor.STEPS },
+                    onClear = if (state.hasStepsOverride) vm::clearManualStepsOverride else null,
+                )
+                Spacer(Modifier.height(12.dp))
 
-            ManualTrackingCard(
-                label = stringResource(R.string.home_heartrate_label),
-                value = state.restingHR?.let {
-                    "$it ${stringResource(R.string.unit_bpm)}"
-                } ?: stringResource(R.string.home_value_unavailable),
-                description = if (state.heartRateIsManualOverride) {
-                    stringResource(R.string.home_manual_override_active)
-                } else {
-                    stringResource(R.string.home_manual_heartrate_description)
-                },
-                onEdit = { activeEditor = ManualMetricEditor.HEART_RATE },
-                onClear = if (state.hasHeartRateOverride) vm::clearManualHeartRateOverride else null,
-            )
-            Spacer(Modifier.height(12.dp))
+                ManualTrackingCard(
+                    label = stringResource(R.string.home_heartrate_label),
+                    value = state.restingHR?.let {
+                        "$it ${stringResource(R.string.unit_bpm)}"
+                    } ?: stringResource(R.string.home_value_unavailable),
+                    description = if (state.heartRateIsManualOverride) {
+                        stringResource(R.string.home_manual_override_active)
+                    } else {
+                        stringResource(R.string.home_manual_heartrate_description)
+                    },
+                    onEdit = { activeEditor = ManualMetricEditor.HEART_RATE },
+                    onClear = if (state.hasHeartRateOverride) vm::clearManualHeartRateOverride else null,
+                )
+                Spacer(Modifier.height(12.dp))
 
-            ManualTrackingCard(
-                label = stringResource(R.string.home_stress_label),
-                value = state.stressLevel?.let {
-                    stringResource(R.string.home_stress_value, it)
-                } ?: stringResource(R.string.home_value_unavailable),
-                description = if (state.stressIsManualOverride) {
-                    stringResource(R.string.home_manual_override_active)
-                } else {
-                    stringResource(R.string.home_manual_stress_description)
-                },
-                onEdit = { activeEditor = ManualMetricEditor.STRESS },
-                onClear = if (state.hasStressOverride) vm::clearManualStressOverride else null,
-            )
+                ManualTrackingCard(
+                    label = stringResource(R.string.home_stress_label),
+                    value = state.stressLevel?.let {
+                        stringResource(R.string.home_stress_value, it)
+                    } ?: stringResource(R.string.home_value_unavailable),
+                    description = if (state.stressIsManualOverride) {
+                        stringResource(R.string.home_manual_override_active)
+                    } else {
+                        stringResource(R.string.home_manual_stress_description)
+                    },
+                    onEdit = { activeEditor = ManualMetricEditor.STRESS },
+                    onClear = if (state.hasStressOverride) vm::clearManualStressOverride else null,
+                )
+            } else {
+                Spacer(Modifier.height(24.dp))
+                OutlinedCard(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = stringResource(R.string.home_history_readonly_note),
+                        modifier = Modifier.padding(16.dp),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
 
             Spacer(Modifier.height(32.dp))
 
@@ -382,6 +420,45 @@ fun HomeScreen(
 }
 
 @Composable
+private fun DateSelectorRow(
+    selectedDate: LocalDate,
+    dates: List<LocalDate>,
+    onDateSelected: (LocalDate) -> Unit,
+    todayLabel: String,
+    yesterdayLabel: String,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        dates.forEach { date ->
+            val isSelected = date == selectedDate
+            OutlinedButton(
+                onClick = { onDateSelected(date) },
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = if (isSelected) {
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                    } else {
+                        MaterialTheme.colorScheme.surfaceContainerHigh
+                    },
+                ),
+            ) {
+                Text(
+                    text = date.toDisplayLabel(todayLabel, yesterdayLabel),
+                    color = if (isSelected) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun MetricGrid(state: HomeUiState) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -458,6 +535,15 @@ private fun MetricGrid(state: HomeUiState) {
                 },
             )
         }
+    }
+}
+
+private fun LocalDate.toDisplayLabel(todayLabel: String, yesterdayLabel: String): String {
+    val today = LocalDate.now()
+    return when (this) {
+        today -> todayLabel
+        today.minusDays(1) -> yesterdayLabel
+        else -> dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault())
     }
 }
 
